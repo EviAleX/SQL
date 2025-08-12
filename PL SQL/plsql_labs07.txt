@@ -1,0 +1,163 @@
+Wyzwalacze bazowo-danowe
+
+Wyzwalacz jest to program składowany w bazie danych, który jest uruchamiany przez system zarządzania bazą danych w momencie, w którym wystąpi zdarzenie, z którym wyzwalacz jest związany.
+
+Zdarzenia, z którymi możemy wiązać wyzwalacze
+1. Operacje DML na tabeli (INSERT, UPDATE, DELETE) - tzw. wyzwalacze DML
+2. Operacje DDL w schemacie lub na poziomie całej bazy danych
+3. Wydarzenia na poziomie bazy (startup, shutdown, błędy) lub na poziomie schematu (login, logout, etc)
+
+1. Wyzwalacze DML
+
+Wyzwalacze te są traktowane jako część polecenia DML, z którym są związane. Oznacza to, że 
+- wyjątek wygenerowany w wyzwalaczu i nieobsłużony w jego kodzie powoduje przerwanie i wycofanie polecenia w ramach którego wyzwalacz został "odpalony"
+- W wyzwalaczach tych nie można zatwierdzać ani wycofywać transakcji. Wyjątek - transakcje autonomiczne (temat będzie omawiany później)
+- W wyzwalaczach tych nie możemy czytać ani modyfikować tabeli tzw. mutującej
+  Tabela mutująca - tabela modyfikowana bezpośrednio bądź pośrednio (poprzez np. klucze obce ON DELETE CASCADE)
+  
+Zdarzenia wyzwalające: INSERT, UPDATE, DELETE
+Moment wykonania: BEFORE lub AFTER
+Zakres: poleceniowy bądź wierszowy
+poleceniowy: wykonywany raz dla całego polecenia
+wierszowy: wykonywany dla każdego wiersza przetwarzanego przez polecenie
+
+składnia
+
+CREATE [OR REPLACE] TRIGGER nazwa_wyzwalacza
+BEFORE|AFTER polecenie [OR polecenie][OR polecenie] ON nazwa_tabeli
+[FOR EACH ROW]
+[Declare
+   sekcja deklaracji zmiennych]
+BEGIN
+  sekcja wykonywalna
+[EXCEPTION
+  sekcja obsługi wyjątków]
+END;
+
+
+przykład 1:
+
+create or replace trigger DEPT_TRG1
+before delete or update on departments
+begin
+   if to_char(sysdate,'HH24') between 8 and 17 then
+      raise_application_error(-20001,'It is not possible to delete or update departments between 8 and 17');
+   end if;
+end; 
+
+przykład 2:
+create or replace trigger EMP_SALARY_CONTROL_TRG
+before update on employees
+for each row
+begin
+   if :new.salary < :old.salary then
+      raise_application_error(-20002,'Decreasing salary is forbidden');
+   end if;
+end;
+
+Uwagi do pow. przykładów
+1. raise_application_error - procedura wbudowana w system Oracle umożliwiająca łatwe generowanie wyjątków powiązanych z numerami błędów
+   pierwszym parametrem jest nr błędu (numery od -20000 do -99999 są zarezerwowane własnie do takich operacji)
+   drugim parametrem jest komunikat, który chcemy związać z takim numerem błędu
+   
+2. kwalifikatory :NEW i :OLD - mogą być stosowane w wyzwalaczach wierszowych (zarówno BEFORE, jak i AFTER)
+   składnia:
+   :NEW.kolumna_tabeli - nowa wartość w kolumnie
+   :OLD.kolumna tabeli - stara wartość w kolumnie
+   
+   Oczywiście:
+   w wyzwalaczu odpalonym przez polecenie INSERT :OLD.kolumna jest zawsze NULL
+   w wyzwalaczu odpalonym przez polecenie DELETE :NEW.kolumna jest zawsze NULL
+   
+Pojedynczy wyzwalacz możemy związać z więcej, niż jedną operacją (przykład 1)
+W kodzie wyzwalacza możemy rozpoznawać, która operacja spowodowała jego odpalenie poprzez użycie atrybutów
+INSERTING, UPDATING, DELETING
+
+przykład 3:
+
+create or replace trigger DEPT_TRG1
+before delete or update on departments
+begin
+   if UPDATING and to_char(sysdate,'HH24') between 8 and 17 then
+      raise_application_error(-20001,'It is not possible to delete or update departments between 8 and 17');
+   elsif DELETING then
+      raise_application_error(-20003,'It is not possible to delete a departament');
+   end if;
+end; 
+
+
+Zastosowania wyzwalaczy DML
+1. Tworzenie reguł biznesowych, w przypadku których deklaratywne więzy integralności nie wystarczają
+2. Logowanie operacji wykonywanych na kluczowych tabelach (audyt)
+
+
+2. Wyzwalacze INSTEAD OF
+Wyzwalacze te są pomocne w sytuacjach, w których chcielibyśmy zaimplementować operacje DML na perspektywach
+
+składnia:
+
+CREATE OR REPLACE TRIGGER nazwa_wyzwalacza
+INSTEAD OF operation [OR operation][OR operation]
+ON nazwa_perspektywy
+[DECLARE
+   sekcja_deklaracji_zmiennych]
+BEGIN
+   sekcja_wykonywalna
+[EXCEPTION
+   sekcja_obsługi_wyjątków]
+END;
+
+przykład:
+
+create or replace view v_dept_loc_id
+as
+select department_id, location_id from departments;
+
+
+create or replace trigger trg_v_dept_loc_id
+instead of insert or update or delete on v_dept_loc_id
+begin
+if inserting then
+   insert into departments(department_id, department_name, location_id) values (:new.department_id, 'NONAME',:new.location_id);
+elsif updating then
+   if :new.department_id <> :old.department_id then
+      raise_application_error(-20004,'You cannot modify primary key value');
+   else
+      update departments 
+      set location_id = :new.location_id
+      where department_id = :new.department_id;
+   end if;
+elsif deleting then
+   delete from departments
+   where department_id = :old.department_id;
+end if;
+end;
+
+
+zadania
+
+1. Utwórz wyzwalacz wierszowy związany z operacjami DML na tabeli EMPLOYEES, który będzie ochraniał jej zawartość wg następujących reguł
+   - niedopuszczalne sa obniżki pensji
+   - niedopuszczalne są podwyżki pensji o więcej, niż 10%
+   - niedopuszczalne jest zatrudnianie pracownika bez podawania jego pensji lub z pensją większą, niż najniższa pensja na danym stanowisku
+   - niedopuszczalne są operacje DELETE poza ostatnim dniem miesiąca
+   
+   
+   
+2. Utwórz perspektywę V_EMP_DEPT, która będzie pokazywała numer departamentu i liczbę zatrudnionych w nim pracowników
+   Utwórz wyzwalacz INSTEAD OF na perspektywie V_EMP_DEPT, który będzie umożliwiał wykonanie na niej operacji DELETE
+   operacja ta będzie oznaczała usunięcie wszystkich pracowników z zadanego departamentu.
+
+zadania domowe
+   
+3. Wstaw nowy wiersz do tabeli DEPARTMENTS reprezentujący departament o nazwie DELETED_DEPT oraz ID równym 0
+   Utwórz wyzwalacz wierszowy BEFORE związany z operacją DELETE na tabeli DEPARTMENTS.
+   Wyzwalacz ten ma implementować następujące dwie reguły biznesowe:
+   1. gdy ktoś próbuje usunąć departament 0 to wyzwalacz zgłasza wyjątek zdefiniowany przez programistę INVALID_DEPT_OPERATION
+   2. w przypadku, gdy ktoś próbuje usunąć inny departament to wszystkich pracujących tam pracowników przesuwa się do departamentu 0
+   
+4. Utwórz wyzwalacz wierszowy BEFORE związany z poleceniem INSERT na tabeli JOB_GRADES
+   Wyzwalacz ten ma nie dopuszczać do wstawiania wierszy z wartościami HIGHEST_SAL większymi, niż 15000
+
+   
+

@@ -1,0 +1,234 @@
+wyjątki
+
+Wyjątek jest to błąd WYKONANIA programu. Czyli sytuacja, w której program PL/SQL kompiluje się bez błędów, ale na skutek np. szczególnych wartości zmiennych próbuje WYKONAĆ niedozwoloną
+operację taką, jak np. dzielenie przez zero
+
+PL/SQL oferuje skuteczną metodę oprogramowywania sytuacji wyjątkowych, podobną do Javy lub C++ - w ten sposób unikamy konieczności implementacji wielokrotnie zagnieżdżonych instrukcji
+warunkowych
+
+PL/SQL definiuje 3 typy wyjątków
+
+1. wyjątki predefiniowane
+   jest to wyjątek, który
+   - posiada predefiniowany, wbudowany w maszynę PL/SQL identyfikator (podobnie do identyfikatora kursora niejawnego SQL)
+   - jest związany z konkretnym numerem błędu Oracle
+   przykłady:
+	NO_DATA_FOUND: polecenie SELECT INTO nie zwróciło żadnego wiersza
+        TOO_MANY_ROWS: polecenie SELECT INTO zwróciło więcej, niż jeden wiersz
+        ZERO_DIVIDE
+
+   pełna lista: https://docs.oracle.com/cd/B10501_01/appdev.920/a96624/07_errs.htm
+
+   obsługa takich wyjątków sprowadza się do ich oprogramowania w sekcji obsługi wyjątków bloku PL/SQL 
+
+2. wyjątki niepredefiniowane
+   jest to wyjątek, który
+   - nie posiada predefiniowanego identyfikatora
+   - jest konkretnym numerem błędu Oracle
+   przykład:
+   -60 : deadlock detected, while waiting on resource
+
+   obsługa takich błędów polega na
+   - zadeklarowaniu jego identyfikatora (w sekcji deklaracji zmiennych)
+
+     składnia:
+     nazwa_wyjątku exception
+
+  -związaniu go z konkretnym numerem błędu Oracle (również w sekcji deklaracji zmiennych)
+     składnia
+     PRAGMA_EXCEPTION_INIT(identyfikator,numer_błędu_oracle);
+
+  - obsługi - w sekcji wykonywalnej (o tym za chwilę)
+
+  przykład:
+
+  create or replace procedure update_data
+  is
+     deadlock_detected exception;
+     pragma_exception_init(deadlock_detected,-60);
+  begin
+  ...
+  end;
+  /
+
+3. Wyjątki zdefiniowane przez programistę
+   Są to sytuacje, które z punktu widzenia Oracle NIE SĄ BłĘDAMI, ale są nimi z punktu widzenia logiki aplikacji 
+   np. próba ustawienia pracownikowi pensji na wartość poniżej zera
+   Obsługa takich wyjątków polega na
+   - zadeklarowaniu identyfikatora (w sekcji deklaracji zmiennych)
+   - w sekcji wykonywalnej - wywołanie instrukcji RAISE
+     składnia
+        RAISE identyfikator_wyjątku;
+
+   przykład:
+
+   create or replace procedure update_salary(p_emp_id number, p_new_sal number)
+   is
+       salary_lower_than_zero exception;
+   begin
+       if p_new_sal < 0 then
+          raise salary_lower_than_zero;
+       end if;
+       ...
+   end;
+
+   - w sekcji obsługi wyjątków - obsłużenie wyjątku
+
+OBSŁUGA WYJĄTKÓW
+1. sekcja obsługi wyjątków
+  
+   składnia
+   begin
+      .... // sekcja wykonywalna
+   EXCEPTION
+     WHEN id_wyjątku1 OR id_wyjątku2 OR ... OR id_wyjątkuN THEN
+        kod obsługujący wyjątek
+     WHEN id_wyjatkuN+1 OR ... THEN
+        kod_obsługujący wyjątek
+    [WHEN OTHERS THEN]
+        kod obsługujący wszystkie pozostałe wyjątki
+  end;
+
+
+
+  przykład
+  
+   create or replace procedure update_salary(p_emp_id number, p_new_sal number)
+   is
+       salary_lower_than_zero exception;
+       deadlock_detected exception;
+       pragma exception_init(deadlock_detected,-60);
+       v_current_sal number(10);
+       v_new_sal     number(10);
+   begin
+       if p_new_sal < 0 then
+          raise salary_lower_than_zero;
+       end if;
+
+       select salary into v_current_sal       // tutaj mogą wystąpić błędy TOO_MANY_ROWS lub NO_DATA_FOUND
+       from employees
+       where employee_id = p_emp_id;
+       
+       if p_new_sal < v_current_sal then
+          v_new_sal := v_current_sal;
+       else
+          v_new_sal := p_new_sal;
+       end if;
+
+       update employees                       // tutaj może wystąpić błąd -60 (deadlock)
+       set salary = v_new_sal
+       where employee_id = p_emp_id;
+
+       commit;
+    exception
+       when salary_lower_than_zero then
+            rollback;
+            dbms_output.put_line('Salary lower, than 0');
+       when no_data_found or too_many_rows then
+            rollback;
+            dbms_output.put_line('Wrong Employee id');
+
+       when deadlock_detected then
+            rollback;
+            dbms_output.put_line('Deadlock detected');
+
+      when others then
+         rollback;
+         dbms_output.put_line('Other error has occurred');
+    end;
+
+ Funkcje SQLCODE i SQLERRM 
+ SQLCODE zwraca numer ostatniego błędu
+ SQLERRM zwraca komunikat o błędzie
+ procedura RAISE_APPLICATION_ERROR ( nr_bledu, komunikat )
+ 
+    create or replace procedure update_salary_v2(p_emp_id number, p_new_sal number)
+   is
+       deadlock_detected exception;
+       pragma exception_init(deadlock_detected,-60);
+       v_current_sal number(10);
+       v_new_sal     number(10);
+       v_sqlcode     number(10);
+       v_sqlerrm     varchar2(100);
+   begin
+       if p_new_sal < 0 then
+          raise_application_error(-20001,'Salary lower than 0');
+       end if;
+
+       select salary into v_current_sal       // tutaj mogą wystąpić błędy TOO_MANY_ROWS lub NO_DATA_FOUND
+       from employees
+       where employee_id = p_emp_id;
+       
+       if p_new_sal < v_current_sal then
+          v_new_sal := v_current_sal;
+       else
+          v_new_sal := p_new_sal;
+       end if;
+
+       update employees                       // tutaj może wystąpić błąd -60 (deadlock)
+       set salary = v_new_sal
+       where employee_id = p_emp_id;
+
+       commit;
+    exception
+       when salary_lower_than_zero then
+            rollback;
+            dbms_output.put_line('Salary lower, than 0');
+       when no_data_found or too_many_rows then
+            rollback;
+            dbms_output.put_line('Wrong Employee id');
+
+       when deadlock_detected then
+            rollback;
+            dbms_output.put_line('Deadlock detected');
+
+      when others then
+         v_sqlcode := sqlcode;
+         v_sqlerrm := substr(sqlerrm,1,100);
+         rollback;
+         dbms_output.put_line(v_sqlcode||':'||v_sqlerrm);
+    end;
+ 
+
+
+    Gdy podczas wykonywania programu w danej instrukcji wystąpi błąd, następuje
+    a) skok do sekcji obsługi wyjątków
+    b) sprawdzenie, gdzie w tej sekcji jest obsługiwany dany wyjątek
+    c) wykonanie stosownej (i tylko tej) sekcji obsługi 
+    d) wyjście z programu BEZ BŁĘDU
+
+2. Zasada propagacji wyjątków
+   Jeśli dany wyjątek, nie jest obsługiwany w żadnej sekcji WHEN ... wtedy
+   - program się kończy z tym właśnie błędem
+   - sterowanie jest przekazywane do środowiska wołającego (np. SQL Developera, iAcademy, albo nadrzędnego programu PL/SQL wołającego)
+   - jeśli nadrzędny program wołający obsłuży ów wyjątek w swoich sekcjach WHEN, wtedy ów program konczy się bez błędu
+   - jeśli nadrzędny program wołający owego wyjątku również nie obsługuje, to sytuacja się powtarza - kończy się z owym błędem i sterowanie jest przekazywane do środowiska wołającego
+   - środowiska takie, jak SQL Developer, iAcademy, SQL*Plus, w takich przypadkach drukują na wyjściu stosowny komunikat
+
+
+Zadanie
+   1. napisz procedurę, której zadaniem będzie ustawienie nowej pensji pracownika
+      procedura ta ma przyjmować następujące parametry
+      a) P_LAST_NAME VARCHAR2 - nazwisko pracownika
+      b) P_NEW_SALARY NUMBER  - jego nową pensję
+      Procedura ma obsługiwać następujące sytuacje wyjątkowe
+      - NEW_SAL_TOO_LOW - jesli nowa pensja jest mniejsza od starej - wyjątek zdefiniowany przez programistę
+                          w takiej sytuacji procedura ma drukować komunikat Nowa pensja mniejsza od starej oraz wycofywać transakcję
+      - NO_DATA_FOUND   - wyjątek zdefiniowany przez programistę - jeśli pracownik o zadanym nazwisku nie istnieje
+                          w takiej sytuacji procedura ma drukować komunikat 'Nieistniejący pracownik' oraz wycofywać transakcję
+	
+	2. zmodyfikuj zadanie domowe nr. 2 z zajęć nr 3 tak, aby uodpornić je na sytuację, w której więcej, niż 1 pracownik
+	   zarabia maks. pensję.
+
+Zadania domowe
+   1.  Uzupełnij kod procedury z zadania 1 o obsługę wyjątków
+       TOO_MANY_ROWS (wyjątek predefiniowany, jeśli istnieje więcej pracowników o podanym nazwisku)
+       NEW_SALARY_LOWER_THAN_100 (wyjątek zdefiniowany przez programistę, jeśli nowa pensja jest mniejsza, niż 100)
+
+   2. Napisz procedurę, której zadaniem będzie wstawienie nowego wiersza do tabeli departments
+      procedura powinna 
+	  a. akceptować następujące parametry:
+	     p_dept_id - id nowego departamentu
+		 p_dept_name - nazwa nowego departamentu
+		 pozostałe pola w nowym wierszu pozostaw puste
+	  b. obsługiwać predefiniowany wyjątek DUP_VAL_ON_INDEX, który jest generowany w sytuacji, gdy próbujemy naruszyć klucz główny

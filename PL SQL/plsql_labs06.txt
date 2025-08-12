@@ -1,0 +1,207 @@
+pakiety PL/SQL
+
+Pakiety PL/SQL są odpowiednikami bibliotek znanych z innych języków programowania
+
+Pakiet pozwala na
+- zadeklarowanie i zdefiniowanie procedur oraz funkcji
+- przeciążanie procedur oraz funkcji
+- zadeklarowanie typów, zmiennych, kursorów i wyjątków celem ich wielokrotnego wykorzystywania na zewnątrz, jak i wewnątrz pakietu
+
+Pakiet składa się z dwóch części
+
+- specyfikacji, która zawiera deklaracje elementów (procedur, funkcji, typów, zmiennych, kursorów i wyjątków) dostępnych na zewnątrz (publicznych)
+- ciała, które zawiera   
+  - deklaracje typow, zmiennych, kursorów oraz wyjątków niedostępnych na zewn. pakietu (prywatnych)
+  - definicje procedur i funkcji zadeklarowanych w specyfikacji
+  - definicje procedur i funkcji prywatnych
+
+Jeśli specyfikacja zawiera jedynie deklaracje zmiennych, kursorów oraz wyjątków, to ciało jest niepotrzebne.
+Specyfikacja zatem może istnieć, być poprawna i być wykorzystywana bez ciała. Ciało bez specyfikacji natomiast zawsze jest niepoprawne.
+  
+Obydwie te składowe (specyfikację i ciało) tworzy się osobnymi poleceniami
+
+
+specyfikacja:
+CREATE [OR REPLACE] PACKAGE nazwa_pakietu
+IS
+	deklaracje typów, zmiennych, kursorów, wyjątków
+	
+	-- deklaracje funkcji (sam nagłówek)
+	function nazwa_funkcji(lista_parametrów) return typ_wyniku;
+	...
+	-- deklaracje procedur
+	procedure nazwa_procedury(lista_parametrów);
+	...
+end;
+/
+
+przykład:
+create or replace package pkg_emp_operations
+is
+	cursor c_emp is select * from employees;
+	r_emp employees%rowtype;
+	
+    function get_max_sal(p_department_id number) return number;
+	
+	procedure drop_employee(p_employee_id number);
+	
+end;
+
+ciało:
+create or replace package body pkg_emp_operations
+is
+    function get_max_sal(p_department_id number) return number
+	is
+	    v_sal employees.salary%type;
+	begin
+	   select max(salary) 
+	   into v_salary
+	   from employees
+	   where department_id = p_department_id;
+	   
+	   return v_salary;
+	end;
+	
+	procedure drop_employee(p_employee_id number)
+	is
+	begin
+	   delete from employees
+	   where employee_id = p_employee_id;
+	   
+	   commit;
+	end;
+end;
+
+
+przeciążanie (overloading)
+Przeciążanie jest mechanizmem pozwalającym na definowanie kilku różnych procedur, bądź funkcji o tej samej nazwie, ale innej liście parametrów formalnych.
+To, która wersja takiej procedury lub funkcji jest w danym momencie wołana, jest roztrzygane przez kompilator na etapie kompilacji kodu wołającego ów podprogram.
+
+W PL/SQL możemy definiować przeciążane podprogramy jedynie dzięki pakietom.
+
+przykład
+
+create or replace package pkg_emp_operations
+is
+	cursor c_emp is select * from employees;
+	r_emp employees%rowtype;
+	
+        function get_max_sal(p_department_id number) return number;
+	
+	function get_max_sal(p_department_id number, p_job_id varchar2) return number; -- przeciążona wersja funkcji get_max_sal
+	
+	procedure drop_employee(p_employee_id number);
+	
+	procedure drop_employee(p_job_id varchar2);  -- przeciążona wersja procedury drop_employee
+
+end;
+
+ciało oczywiście musi zawierać definicje przeciążonych programów:
+create or replace package body pkg_emp_operations
+is
+        function get_max_sal(p_department_id number) return number
+	is
+	    v_sal employees.salary%type;
+	begin
+	   select max(salary) 
+	   into v_salary
+	   from employees
+	   where department_id = p_department_id;
+	   
+	   return v_salary;
+	end;
+	
+	function get_max_sal(p_department_id number, p_job_id varchar2) return number
+	is
+	    v_sal employees.salary%type;
+	begin
+	   select max(salary) 
+	   into v_salary
+	   from employees
+	   where department_id = p_department_id
+	     and job_id = p_job_id;
+	   
+	   return v_salary;
+	end;
+	
+	procedure drop_employee(p_employee_id number)
+	is
+	begin
+	   delete from employees
+	   where employee_id = p_employee_id;
+	   
+	   commit;
+	end;
+	
+    procedure drop_employee(p_job_id varchar2)
+	is
+	begin
+	   delete from employees
+	   where job_id = p_job_id;
+	   
+	   commit;
+	end;
+end;
+
+odwoływanie się do składowych pakietów - stosujemy notację kropkową pakiet.składowa
+
+np.
+
+begin 
+   pkg_emp_operations.drop_employee(111);
+end;
+
+zalety pakietów:
+1. pakiety pozwalają na grupowanie programów, zmiennych, wyjątków i typów o podobnym zastosowaniu
+   (np. w ramach danej aplikacji)
+   
+2. pakiety pozwalają na przeciążanie procedur i funkcji
+
+3. pakiety pozwalają na deklaracje typów, zmiennych, kursorów i wyjątków, które później mogą
+   być wielokrotnie wykorzystywane
+   
+4. pakiety pozwalają na lepsze zarządzanie pamięcią przeznaczoną na buforowanie kodu PL/SQL - 
+   ich stosowanie umożliwia zredukowanie fragmentacji tego obszaru pamięcią
+   
+5. zmienne pakietowe i kursory zachowują stan w ramach sesji użytkownika
+
+
+zadanie
+1. stwórz pakiet PL/SQL dept_ops, który będzie grupował następujące procedury i funkcje:
+
+   a) procedure new_dept(p_department_id number, p_department_name varchar2) 
+      jej zadaniem będzie wstawianie nowego departamentu
+	  
+   b) procedure del_dept(p_department_id number)
+      jej zadaniem będzie usuwanie departamentu o podanym w parametrze identyfikatorze
+      
+      
+2. w pakiecie dept_ops zdefiniuj
+   - przeciążoną wersję procedury new_dept
+     procedura ta winna przyjmować tylko jeden parametr formalny - p_department_name typu VARCHAR2,
+     natomiast wartość department_id dla nowego departamentu powinna wyznaczać automatycznie, odczytując max(department_id) 
+	 i zwiększając owo maksimum o 1
+     
+   - przeciążoną wersję procedury del_dept
+     procedura powinna przyjmować tylko jeden parametr formalny p_department_name typu VARCHAR2
+     procedura powinna usuwać departament o podanej w owym parametrze NAZWIE departamentu
+
+zadanie domowe
+ stwórz pakiet PL/SQL grupujący następujące składniki
+   1. kursor c_emp umożliwiający odczytywanie wszystkich danych o pracownikach. 
+      Wyniki powinny być posortowane wg. nr departamentu, stanowiska pracy, pensji i nazwiska
+	  oraz procedury otwierające i zamykające kursor c_emp. 
+      Procedura otwierająca powinna otwierać kursor jedynie wtedy, gdy nie jest on otwarty
+	  Procedura zamykająca powinnna zamykać kursor jedynie wtedy, gdy nie jest on zamknięty
+	  
+   2. procedurę, która czyta nr departamentu, nazwisko i pensję pracowników z kursora c_emp i drukuje je na wyjściu przy użyciu
+      odwołania do dbms_output.put_line.
+	  Procedura ta, aoby otwierać i zamykać kursor powinna korzystać z procedur zdefiniowanych w punkcie #b
+	  
+   	
+     
+
+	  
+	  
+
+

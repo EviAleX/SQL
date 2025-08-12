@@ -1,0 +1,147 @@
+zadanie
+1. utwórz typ obiektowy osoba, posiadający następujące atrybuty
+nazwisko varchar2(30)
+imie     varchar2(30)
+data_urodzenia varchar2(30)
+nr_pesel       varchar2(30)
+
+create or replace type t_osoba as object (
+   nazwisko varchar2(30),
+   imie     varchar2(30),
+   data_urodzenia date,
+   nr_pesel varchar2(30),
+   member procedure zmien_nazwisko(nowe_nazwisko varchar2),
+   member procedure zmien_imie(nowe_imie varchar2),
+   member function podajinicjaly return varchar2,
+   member function podajwiek return number );
+
+
+
+oraz metody
+zmien_nazwisko(nowe_nazwisko varchar2) -- ma odpowiadać za ustawienie wartości atrybutu nazwisko na nowe_nazwisko
+zmien_imie(nowe_imie varchar2) -- ma odpowiadać za ustawienie wartości atrybutu imie na nowe_imie
+podajinicjaly() return varchar2 -- ma zwracać inicjały osoby
+podajwiek() return number -- ma zwracać wiek danej osoby
+
+create or replace type body t_osoba as
+  member procedure zmien_nazwisko(nowe_nazwisko varchar2)
+  is
+  begin  
+     nazwisko := nowe_nazwisko;
+  end;
+  
+  member procedure zmien_imie(nowe_imie varchar2)
+  is
+  begin
+     imie := nowe_imie;
+  end;
+  
+  member function podajinicjaly return varchar2
+  is
+  begin
+     return substr(nazwisko,1,1)||substr(imie,1,1);
+  end;
+  
+  member function podajwiek return number
+  is
+  begin
+     return trunc(sysdate-data_urodzenia);
+  end;
+end;     
+
+
+2. utworz tabelę obiektową t_osoby do składowania danych osób
+create table t_osoby of t_osoba;
+
+3. napisz procedurę składowaną copy_employees, która czytałaby dane pracowników z tabeli employees a następnie na podstawie każdego wiersza tworzyłaby obiekt
+typu osoba i wstawiała ten obiekt do tabeli osoby. Data urodzenia powinna być wyznaczana ze wzoru hire_date - 25 lat.
+
+create or replace procedure copy_employees
+is
+  v_osoba t_osoba;
+begin
+  for r in (select * from employees) loop
+      v_osoba := t_osoba(r.last_name, r.first_name, r.hire_date - 25*365, '0000');
+      insert into t_osoby values (v_osoba);
+  end loop;
+end;  
+
+
+zadania domowe
+1. zmodyfikuj typ obiektowy z zadania nr 1 dodając do niego konstruktor pozwalający na tworzenie obiektów tej klasy jedynie na podstawie nazwiska i     imienia.
+   Data urodzenia w takim przypadku byłaby ustawiona na bieżącą datę systemową, a PESEL na wartość 0000000000000 
+
+create or replace type t_osoba as object (
+   nazwisko varchar2(30),
+   imie     varchar2(30),
+   data_urodzenia date,
+   nr_pesel varchar2(30),
+   constructor function t_osoba (p_nazwisko varchar2, p_imie varchar2) return self as result,
+   member procedure zmien_nazwisko(nowe_nazwisko varchar2),
+   member procedure zmien_imie(nowe_imie varchar2),
+   member function podajinicjaly return varchar2,
+   member function podajwiek return number );
+   
+create or replace type body t_osoba as
+
+  constructor function t_osoba (p_nazwisko varchar2, p_imie varchar2) return self as result
+  is
+  begin
+  	nazwisko := p_nazwisko;
+	imie := p_imie;
+	data_urodzenia := sysdate;
+	nr_pesel := '0000000000000';
+	return;
+  end;
+
+  member procedure zmien_nazwisko(nowe_nazwisko varchar2)
+  is
+  begin  
+     nazwisko := nowe_nazwisko;
+  end;
+  
+  member procedure zmien_imie(nowe_imie varchar2)
+  is
+  begin
+     imie := nowe_imie;
+  end;
+  
+  member function podajinicjaly return varchar2
+  is
+  begin
+     return substr(nazwisko,1,1)||substr(imie,1,1);
+  end;
+  
+  member function podajwiek return number
+  is
+  begin
+     return trunc(sysdate-data_urodzenia);
+  end;
+end;        
+   
+   
+
+2. napisz procedurę składowaną w bazie danych, która akceptowałaby dwa parametry wejściowe P_LAST_NAME oraz P_FIRS_NAME typu VARCHAR2, na ich
+   podstawie tworzyłaby obiekt klasy osoba (poprzez wywołanie konstruktora zdefiniowanego w zadaniu nr 1) a nowo utworzony obiekt klasy osoba 
+   wstawiałaby do tabeli T_OSOBY
+   
+   create or replace procedure nowa_osoba(p_last_name varchar2, p_first_name varchar2)
+   is
+     	o t_osoba;
+   begin
+      e := t_osoba(p_last_name, p_first_name);
+	  insert into t_osoby values (o);
+   end;
+   /
+   
+
+
+
+
+
+
+
+
+
+
+

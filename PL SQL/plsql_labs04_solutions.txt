@@ -1,0 +1,67 @@
+zadania:
+
+1. napisz funkcję, której zadaniem będzie podwyższenie pensji o podany procent pracownikom zatrudnionym na podanym stanowisku.
+   Funkcja powinna zwracać liczbę pracowników, którzy otrzymali podwyżkę
+   Funkcja powinna przyjmować dwa parametry
+   a) p_job_id varchar2 - stanowisko pracy
+   b) p_percent number  - procent podwyżki
+   
+   create or replace function set_new_sal(p_job_id varchar2, p_percent number) return number
+   is
+      v_rows number(10);
+   begin
+      update employees
+      set salary = salary*(1+p_percent/100)
+      where job_id = p_job_id;
+      
+      v_rows := sql%rowcount;
+      
+      return v_rows;
+   end;
+   
+2. napisz procedurę, której zadaniem będzie wydrukowanie nazwisk (wywołanie DBMS_OUTPUT.PUT_LINE) pracowników zatrudnionych w podanym departamencie
+   Procedura powinna przyjmować 1 parametr:
+   p_department_id number - nr departamentu z którego drukujemy nazwiska
+   
+   create or replace procedure print_emps(p_department_id number)
+   is
+   begin
+      for r in (select *
+                from employees
+                where department_id = p_department_id) loop
+          dbms_output.put_line(r.last_name);
+      end loop;
+   end;
+   
+zadania domowe
+1. napisz procedurę, której zadaniem będzie wydrukowanie listy stanowisk pracy funkcjonujących w zadanym departamencie (DBMS_OUTPUT.PUT_LINE)
+Procedura powinna przyjmować 1 parametr - numer departamentu, z którego chcemy wydrukować stanowiska
+UWAGA: lista powinna zawierać wyłącznie unikalne nazwy stanowisk pracy
+
+   create or replace procedure print_jobs(p_department_id number)
+   is
+   begin
+      for r in (select distinct job_id
+                from employees
+                where department_id = p_department_id) loop
+          dbms_output.put_line(r.job_id);
+      end loop;
+   end;
+   
+2. napisz procedurę, której zadaniem będzie wydrukowanie przy użyciu procedury DBMS_OUTPUT.PUT_LINE listę nazwisk, imion i pensji pracowników
+   pracujących na stanowisku przekazanym w parametrze P_JOB_ID   
+   
+   create or replace procedure print_employees(p_job_id varchar2)
+   is
+   begin
+   		for r in (select *
+		          from employees
+				  where job_id = p_job_id) loop
+			dbms_output.put_line(r.last_name||','||r.first_name|','||r.salary);
+		end loop;
+	end;
+	/
+
+
+
+   

@@ -1,0 +1,95 @@
+zadania
+
+1. napisz funkcję, która zwraca maks. pensje pracowników pracujących w departamencie, którego numer przekazywany jest w parametrze tej funkcji p_dept_id
+
+create or replace function get_max_sal(p_dept_id number) return number
+is
+   v_max_sal number(7.2);
+begin
+   select max(salary)
+   into v_max_sal
+   from employees
+   where department_id = p_dept_id;
+   
+   return v_max_sal;
+end;
+
+2. zmodyfikuj tą funkcję tak, aby zwracała maks. pensję pracowników pracujących w departamencie, którego NAZWĘ przekazujesz w jej parametrze
+
+create or replace function get_max_sal(p_dept_name varchar2) return number
+is
+   v_max_sal number(7.2);
+begin
+   select max(salary)
+   into v_max_sal
+   from employees
+   where department_id = (select department_id
+                          from departments
+                          where department_name = p_dept_name);
+   
+   return v_max_sal;
+end;
+
+
+3. napisz procedurę, odpowiedzialną za modyfikację pensji pracowników
+   - parametr p_dept_id określać będzie departament, któremu dajemy podwyżkę
+   - parametr p_percent określać będzie procent podwyżki
+   - procedura ma zatwierdzać transakcję
+   
+create or replace procedure update_salaries(p_dept_id number, p_percent number)
+is
+begin
+   update employees
+   set salary = salary*(1+p_percent/100)
+   where department_id = p_dept_id;
+end;
+
+zadania domowe
+1. napisz procedurę, która będzie wstawiała do tabeli JOB_GRADES nową stawkę płacową
+   GRADE_LEVEL nowej stawki powinno być ustawiane na max(GRADE_lEVEL) + 1
+   LOVEST_SAL nowej stawki powinno byc ustawiane ma max(HIGHEST_SAL) + 1
+   HIGHES_SAL nowej stawki powinno byc ustawiane na LOVEST_SAL nowej stawki + 1000
+
+create or replace procedure new_grade
+is
+   v_new_grade varchar2(1);
+   v_new_low   number(7,2);
+   v_new_high  number(7,2);
+begin
+   select chr(ascii(max(grade_level))+1), max(lowest_sal)+1, max(highest_sal)+1
+   into v_new_grade, v_new_low, v_new_high
+   from job_grades;
+   
+   insert into job_grades(grade_level, lowest_sal, highest_sal)
+   values (v_new_grade, v_new_low, v_new_high);
+end;
+
+2. napisz procedurę, której zadaniem będzie znalezienie na zadanym w parametrze P_JOB_ID
+   najlepiej zarabiającego pracownika a następnie jego zwolnienie (usunięcie stosownego wiersza z tabeli EMPLOYEES)
+   procedura powinna przyjmować jeden parametr : P_JOB_ID VARCHAR2
+   
+create or replace procedure del_emp(p_job_id varchar2)
+is
+	v_emp_id number(10);
+begin
+   select employee_id
+     into v_emp_id
+   from employees
+   where salary = (select max(salary)
+                   from employees
+				   where job_id = p_job_id);
+   
+   delete from employees
+   where employee_id = p_emp_id;
+   
+   commit;
+end;
+/
+   
+
+
+
+
+
+
+

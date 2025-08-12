@@ -1,0 +1,173 @@
+Witold Świerzy
+wswier@sgh.waw.pl
+-----------------
+
+www.oracle.com
+--------------
+
+Regula Biznesowa: regula kontrolujaca poprawnosc danych w tabeli wzgledem logiki aplikacji. Dzieki regulom biznesowym
+jestesmy w stanie zapewnic poprawnosc i spojnosc danych.
+
+Przyklady deklaratywnych regul biznesowych: klucz glowny, klucz obcy, klucz unikalny, niepustosc.
+Tego typu reguly biznesowe nie wymagaja kodowania zadnego algorytmu - deklarujemy je na poziomie tabeli badz kolumny
+stad ich nazwa: dklaratywne reguly biznesowe.
+
+
+Relacyjne bazy danych wymagaja mechanizmow umozliwiajacych kodowanie w praktyce dowolnie zlozonych regul biznesowych,
+na ktorych zadeklarowanie owe deklaratywqne wiezy integralnosci nie wystarczaja.
+
+Stad pomysl na jezyki programowania umozliwiajace kodowanie, wykonywanie i skladowanie programow w relacyjnych
+bazach danych
+
+Przyklady: MS SQL: TSQL
+           Oracle: PL/SQL
+
+PL/SQL
+------
+
+PL/SQL jest jezykiem programowania:
+posiada konstrukcje sterujace (petle, warunki)
+umozliwia kodowanie algorytmow
+
+PL/SQL zupelnie naturalnie wspolpracuje z SQLem
+
+PL/SQL jest jezykiem strukturalnym, posiadajacym rozszerzenia obiektowe
+
+typy programow PL/SQL
+- anonimowe bloki PL/SQL
+- procedury
+- funkcje
+- pakiety (biblioteki procedur i funkcji)
+- wyzwalacze 
+
+Anonimowy blok PL/SQL jest programem NIENAZWANYM, co oznacza, ze nie moze byc skladowany w bazie danych
+Cykl zycia takiego programu jest nastepujacy
+- wprowadzamy kod Anonimowego Bloku PL/SQL
+- wysylamy kod tego bloku do serwera bazy danych
+- serwer bd wykonuje ten kod
+- my dostajemy wyniki
+- serwer NIE ZAPAMIETUJE kodu tego anonimowego bloku 
+(aby go ponownie wykonac, musimy go jeszcze raz przeslac do serwera)
+
+DECLARE
+   x number(10) := 5;
+BEGIN
+   DBMS_OUTPUT.PUT_LINE(x*2);
+END;
+/
+
+procedura jest to blok nazwany, ktorego zadaniem jest wykonanie pewnej sekwencji dzialan. Od procedury
+nie wymagamy zwrocenia na zewnatrz jakiegokolwiek wyniku.
+Cykl zycia procedury (czesto zwanej skladowana w bazie danych) jest nastepujacy
+- wprowadzamy kod procedury
+- wysylamy ten kod do serwera bazy danych
+- serwer bazy danych kod kompiluje i ZAPAMIETUJE w bazie, natomiast jeszcze go nie wykonuje
+- aby procedure wykonac, musimy wyslac do serwera zadanie jej wykonania ...
+
+
+CREATE OR REPLACE PROCEDURE NEW_GRADE(GRADE_NUMBER NUMBER, P_LOSAL NUMBER, P_HISAL NUMBER)
+IS
+BEGIN
+   INSERT INTO JOB_GRADES VALUES (GRADE_NUMBER, P_LOSAL, P_HISAL);
+   COMMIT;
+END;
+/
+
+WYKONANIE TEJ PROCEDURY:
+
+BEGIN
+   NEW_GRADE(10,10000,20000);
+END;
+/
+
+funkcja: blok nazwany, ktorego zadaniem jest wykonanie szeroko pojetych "obliczen". Funkcja zawsze zwraca
+precyzyjnie zdefiniowany, pojedynczy wynik. Funkcja (skladowana w bazie danych) jest blokiem nazwanym, wiec jej
+cykl zycia jest identyczny, jak w przypadku procedury.
+
+
+CREATE OR REPLACE FUNCTION SILNIA(N NUMBER) RETURN NUMBER
+IS
+   V_WYNIK NUMBER(10) := 1;
+BEGIN
+   FOR I IN 1..N LOOP
+     V_WYNIK := V_WYNIK*I;
+   END LOOP;
+
+   RETURN V_WYNIK;
+END;
+/
+
+DECLARE
+   v_n NUMBER(10);
+BEGIN
+   V_N := SILNIA(4);
+   DBMS_OUTPUT.PUT_LINE(V_N);
+END;
+/  
+
+Pakiety: biblioteki procedur i funkcji. Bloki nazwane, a wiec ich cykl zycia jest dokladnie taki sam, jak
+cykl zycia procedur i funkcji
+
+Wyzwalacze: nazwane bloki PL/SQL (skladowane w bazie danych) wykonywane automatycznie przez system w chwili, gdy
+wystapi zdarzenie, z ktorym taki wyzwalacz jest zwiazany
+
+przyklad:
+
+CREATE OR REPLACE TRIGGER TR_DEPT
+BEFORE INSERT ON DEPARTMENTS FOR EACH ROW
+BEGIN
+   IF :NEW.DEPARTMENT_NAME IS NULL THEN
+      RAISE_APPLICATION_ERROR(-20000,'Nazwa departamentu NIE MOZE BYC PUSTA !!!');
+   END IF;
+END;
+/
+
+
+Anonimowe bloki PL/SQL (dokladniej):
+
+DECLARE
+   x number(10);
+   y number(10) := 200000;
+   z number(10) := 300000;
+BEGIN
+   x := 10;
+   NEW_GRADE(x,y,z);
+   DBMS_OUPTUT.PUT_LINE
+   ('wstawiono stawke o nrze '||x);
+END;
+/
+
+1. jezyk PL/SQL nie jest jkezykiem CASE SENSITIVE (wielkosc liter w slowach kluczowych NIE MA ZNACZENIA)
+2. kazda instrukcja PL/SQL konczy srednikiem
+3. podstawowe czesci anonimowego bloku PL/SQL
+   - sekcja deklaracji zmiennych (pomiedzy slowami DECLARE i BEGIN)
+     sekcja opcjonalna, jesli nie mamy do zadeklarowania zadnych zmiennych, to rozpoczynamy anonuimowy blok PL/SQL
+     od BEGIN
+   - sekcja wykonywalna (pomiedzy slowami BEGIN i END)
+     w tej sekcji umieszczamy sekwencje instrukcji PL/SQL, ktore chcemy wykonac
+   PL/SQL oczyiwscie umozliwia deklarowanie i wykorzystywanie ZMIENNYCH, czyli nazwanych obszarow pamieci
+   umozliwiajacych przechowywanie waznych dla wykonania programu wartosci
+   przyklady zmiennych w pow. bloku:
+   X, Y, Z
+
+   Deklaracje zmiennej sklada sie z okreslenia
+   - jej nazwy (X, Y lub Z w naszym przypadku)
+   - jej typu  (w naszym przypadku to byl NUMBER)
+   - jesli typ jest zakresowy, to rowniez zakresu (w naszym przypadku - 10 )
+   - opcjonalnie - przypisania do niej wartosci poczatkowej (tutaj:
+                                                             dla X 10
+                                                             dla Y 200000 ... )
+   - deklaracja tez musi konczyc sie srednikiem
+   
+   Zbior typow w PL/SQL jest naturalnym rozszerzeniem zbioru typow SQL
+   - kazdy typ SQL (NUMBER, DATE, VARCHAR2, BLOB, TIMESTAMP,....) istnieje rowniez w PL/SQL
+   - istnieja typy PL/SQL, ktorych w SQL NIE MA
+     najczesciej stosowanym takim typem jest BOOLEAN
+     Wartosci typu BOOLEAN:
+     TRUE, FALSE, NULL 
+     Inne przyklady: tablice i rekordy PL/SQL
+
+   
+     
+
+

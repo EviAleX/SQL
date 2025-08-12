@@ -1,0 +1,120 @@
+
+
+Zadania
+1. zredefiniuj typ obiektowy osoba zdefiniowany w zadaniach z ub. tygodnia. tak, aby można było z niego dziedziczyć
+   w typie tym zadeklaruj i zdefiniuj metodę not final 
+       podaj_zrodlo_dochodow return varchar2
+   w przypadku typu osoba, metoda ta powinna zwracać statyczny napis 'BRAK INFORMACJI'
+   
+   create or replace type t_osoba2 as object (
+   nazwisko varchar2(30),
+   imie     varchar2(30),
+   data_urodzenia date,
+   nr_pesel varchar2(30),
+   member procedure zmien_nazwisko(nowe_nazwisko varchar2),
+   member procedure zmien_imie(nowe_imie varchar2),
+   member function podajinicjaly return varchar2,
+   member function podajwiek return number,
+   not final member function podaj_zrodlo_dochodow return varchar2 )
+   not final;
+   
+   create or replace type body t_osoba2 as
+  member procedure zmien_nazwisko(nowe_nazwisko varchar2)
+  is
+  begin  
+     nazwisko := nowe_nazwisko;
+  end;
+  
+  member procedure zmien_imie(nowe_imie varchar2)
+  is
+  begin
+     imie := nowe_imie;
+  end;
+  
+  member function podajinicjaly return varchar2
+  is
+  begin
+     return substr(nazwisko,1,1)||substr(imie,1,1);
+  end;
+  
+  member function podajwiek return number
+  is
+  begin
+     return trunc(sysdate-data_urodzenia);
+  end;
+  
+  member function podaj_zrodlo_dochodow return varchar2
+  is
+  begin
+     return 'BRAK INFORMACJI';
+  end;
+  
+end; 
+   
+2. utwórz podtyp typu osoba o nazwie pracownik
+   w tym typie metoda podaj_zrodlo_dochodow powinna zwracać statyczny napis 'PRACA ZAROBKOWA'
+   
+   create or replace type pracownik under t_osoba2 (
+    overriding member function podaj_zrodlo_dochodow return varchar2 );
+    
+   create or replace type body pracownik
+   as
+      overriding member function podaj_zrodlo_dochodow return varchar2
+      is
+      begin
+         return 'PRACA ZAROBKOWA';
+      end;
+   end;
+   
+3. utwórz podtyp typu osoba o nazwie uczen
+   w tym typie metoda podaj_zrodlo_dochodow powinna zwracać statyczny napis 'RODZICE'
+ 
+   create or replace type uczen under t_osoba2 (
+   overriding member function podaj_zrodlo_dochodow return varchar2 );
+    
+   create or replace type body uczen
+   as
+      overriding member function podaj_zrodlo_dochodow return varchar2
+      is
+      begin
+         return 'RODZICE';
+      end;
+   end;  
+   
+   
+4. utwórz procedurę drukuj_dane_osoby, której zadaniem będzie drukowanie nazwiska i źródła dochodów danej osoby
+   procedura powinna przyjmować pojedynczy parametr będący obiektem klasy osoba
+   procedura powinna wołać jego metodę podaj_zrodlo_dochodow i podstawiać jej wynik do zmiennej lokalnej v_zrodlo typu varchar2
+   procedura powinna drukować nazwisko i zrodlo dochodów w formacie NAZWISKO: ZRODLO_DOCHODOW
+   
+   
+   create or replace procedure print_person ( v_osoba t_osoba2 )
+   is
+   begin
+      dbms_output.put_line(v_osoba.nazwisko||': '||v_osoba.podaj_zrodlo_dochodow);
+   end;
+   
+   
+5. utwórz anonimowy blok PL/SQL w którym 
+   - zadeklarujesz i zainicjujesz zmienną obiektową typu pracownik
+   - zadeklarujesz i zainicjujesz zmienną obiektową typu uczen
+   - wywołasz procedurę drukuj_dane_osoby raz z jednym obiektem przekazywanym jako parametr a raz z drugim
+   
+   declare
+      p1 pracownik;
+      u1 uczen;
+   begin
+      p1 := pracownik('pracownik1','imie_pracownika1',sysdate,'0000');
+      u1 := uczen('uczen1','imie_ucznia1',sysdate,'0001');
+      
+      print_person(p1);
+      print_person(u1);
+   end;
+   /
+   
+
+
+
+
+
+

@@ -1,0 +1,296 @@
+PL/SQL - Elementy programowania zorientowanego obiektowo
+
+
+I. Wstęp
+--------
+Programowanie zorientowane obiektowo (object-oriented programming) - zorientowane na modelowanie pewnego wycinka rzeczywistości.
+
+W językach zorientowanych obiektowo (C++, Java, Ada, ...) nacisk kładzie się na modelowanie pewnych struktur (klas) opisujących interesujący nas fragment rzeczywistości.
+
+Terminologia:
+klasa (w PL/SQL: typ obiektowy) - szablon wg którego tworzymy składowe naszego programu. Z technicznego punktu widzenia klasa jest TYPEM
+Przykład:
+klasa: Osoba
+
+obiekt - rzeczywista instancja danej klasy. Z technicznego punktu widzenia obiekt jest zmienną pewnego typu obiektowego (klasy)
+przykład obiektu Osoba: Jan Kowalski
+
+atrybut - cecha danego obiektu, np. wiek lub wzrost.
+Atrybuty definiujemy zawsze na poziomie klasy, technicznie są to zmienne ściśle określonych typów zadeklarowane na poziomie deklaracji klasy
+Przykłady atrybutów klasy Osoba
+nazwisko
+imię
+wzrost
+waga
+płeć
+kolor oczu
+
+Różne obiekty tej samej klasy mogą mieć różne wartości poszcz. atrybutów. Przykładowo dwa obiekty klasy Osoba: "Jan Kowalski", "Stanisław Nowak"
+mają różne wartości atrybutów "nazwisko" i "imię"
+
+metoda
+algorytm (procedura lub funkcja) zdefiniowany na poziomie klasy. Celem metody może być manipulowanie wartościami atrybutów w ramach danego obiektu
+Przykład:
+w klasie "Osoba" zdefiniowano metodę "ustawNazwisko(NoweNazwisko)". Celem tej metody będzie ustawienie nowej wartości atrybutu "nazwisko" w konkretnym obiekcie
+klasy "Osoba"
+
+konstruktor
+pewna specyficzna metoda wykonywana przez środowisko automatycznie w chwili tworzenia (nie deklarowania, ale tworzenia - czyli alokacji pamięci dla niego) obiektu danej klasy.
+
+atrybut statyczny i metoda statyczna
+składowe klasy, które funckjonują na poziomie klasy, tzn.
+atrybut statyczny ma zawsze tą samą wartość dla wszystkich obiektów danej klasy
+metoda statyczna ma dostęp tylko do atrybutów statycznych.
+
+Języki te posiadają pewien zestaw wspólnych własności
+- enkapsulacja
+- abstrakcja
+- dziedziczenie
+- polimorfizm
+
+
+
+
+Enkapsulacja jest własnością pozwalającą na tworzenie klas, których obiekty mają pewien zestaw cech niedostępnych bezpośrednio na zewnątrz. 
+Cechy te są dostępne jedynie poprzez wywołanie stosownych metod "set" i "get"
+
+Abstrakcja jest własnością pozwalającą na udostępnienie jedynie wysokopoziomowych składowych obiektów danej klasy. Zatem niskopoziomowe składowe pozostają niedostępne.
+Ich faktyczna implementacja jest niewidoczna dla zewnętrznego świata.
+
+Dziedziczenie jest mechanizmem tworzenia bardziej specjalizowanych klas na podstawie wcześniej zdefiniowanych klas ogólniejszych.
+Przykładowo podklasą klasy Osoba może być klasa Student (lub Nauczyciel)
+Tak zadeklarowana podklasa ma z definicji zdefiniowane (dziedziczone) wszystkie atrybuty i metody zdefiniowane na poziomie nadklasy, możemy również do niej dodać (i w praktyce zawsze tak postępujemy) atrybuty i metody czyniące z owej podklasy klasę bardziej wyspecjalizowaną
+
+Przykładowo, jeśli założymy, że klasa "Student" jest podklasą klasy "Osoba", to z definicji klasa ta posiada atrybuty takie, jak 
+- nazwisko
+- imię
+...
+Ponadto możemy w tej klasie zdefiniować dodatkowe atrybuty, np. NrAlbumu
+
+Polimorfizm jest mechanizmem nieco przypominającym przeciążanie. Polega on na tym, że na poziomie podklasy definiujemy metody o dokładnie takiej samej sygnaturze
+(nazwa, lista parametrów, typ wyniku) jak metody zdefiniowane w nadklasie. Gdy wywołamy metodę danego obiektu, to środowisko wykonawcze automatycznie określi, którą z owych metod faktycznie należy wykonać - tą zdefiniowaną na poziomie nadklasy, czy też tą zdefiniowaną na poziomie podklasy.
+Różnice pomiędzy polimorfizmem a przeciążaniem
+1. sygnatura
+	- polimorfizm - taka sama
+	- przeciążanie - inna
+
+2. określenie, która wersja metody ma być wołana
+        - polimorfizm - na etapie wykonywania programu
+        - przeciążanie - na etapie kompilacji programu
+        
+
+II. OOP w bazie Oracle i PL/SQL
+1. możliwość definiowania typów obiektowych (klas)
+
+2. wykorzystywanie obiektów PL/SQL w programach PL/SQL
+
+3. tabele relacyjne z kolumnami typów obiektowych oraz tabele obiektowe
+
+4. dziedziczenie i polimorfizm (następne zajęcia)
+
+5. metody i atrybuty statyczne (następne zajęcia)
+
+1. składnia
+
+Składnia pozwalająca na utworzenie klasy, podobnie, jak w przypadku pakietów, jest "dwuetapowa"
+W pierwszym etapie tworzymy specyfikację:
+
+CREATE [OR REPLACE] TYPE nazwa_klasy AS OBJECT (
+   atrybut1 typ1 [:=wartość_domyślna],
+   atrybut2 typ2 [:=wartość_domyślna],
+   ...
+   metoda1,
+   metoda2,
+   ...
+)
+
+przykład:
+
+create or replace type osoba as object (
+nazwisko varchar2(30),
+imie     varchar2(30),
+data_urodzenia date,
+member function podajwiek return number );
+
+w kroku następnym tworzymy ciało (jest ono, podobnie, jak w przypadku pakietów, potrzebne jedynie wtedy, gdy w specyfikacji zadeklarowaliśmy metody)
+
+CREATE [OR REPLACE] TYPE BODY nazwa_klasy AS 
+  definicja_metody1;
+  definicja_metody2;
+  ...
+END;
+
+przykład:
+create or replace type body osoba as 
+ member function podajwiek return number
+ is
+ begin
+    return trunc((sysdate-data_urodzenia)/365);
+ end;
+end;
+/
+
+
+2. Deklaracja i wykorzystywanie obiektów w programach PL/SQL
+a. deklaracja - sekcja deklaracji zmiennych
+zmienna typ_obiektowy;
+
+przykład:
+declare
+   o1 osoba;
+begin
+   ...
+end;
+
+b. inicjalizacja - sekcja wykonywalna
+zmienna := nazwa_typu(wartość_atrybutu1, wartość_atrybutu2,...);
+
+przykład:
+declare
+   o1 osoba;
+begin
+   o1 := osoba('Kowalski','Jan',to_date('01-01-2000','DD-MM-YYYY');
+   ...
+end;
+
+c. wykorzysytywanie metod i atrybutów.
+Stosujemy notację kropkową: obiekt.składowa
+przykład:
+declare
+   o1 osoba;
+   wiek_o1 number(3);
+begin
+   o1 := osoba('Kowalski','Jan',to_date('01-01-2000','DD-MM-YYYY'));
+   wiek_o1 := o1.podajwiek();
+   dbms_output.put_line(wiek_o1);
+end;
+/
+
+3. tabele obiektowe
+składnia tworzenia:
+CREATE TABLE nazwa_tabeli OF nazwa_typu_obiektowego
+
+przykład:
+create table t_osoby of osoba;
+
+składnia wstawiania
+INSERT INTO nazwa_tabeli VALUES (obiekt)
+
+przykład:
+insert into t_osoby values (osoba('Jan','Kowalski',to_date('2000-01-02','YYYY-MM-DD')));
+
+składnia pozostałych poleceń nie zmienia się, poza jednym elementem:
+ponieważ odwołanie się do składowych obiektu wymaga stosowania notacji kropkowej (obiekt.składowa), w praktyce, gdy chcemy się odwołać do metody, to musimy zdefiniować alias
+do tabeli obiektowej
+przykład:
+
+select *
+from t_osoby; -- przykład działający
+
+select nazwisko from t_osoby; -- przykład działający
+
+select podajwiek() from t_osoby; -- przykład niedziałający
+
+select o.podajwiek() from t_osoby o; -- przykład działającyza
+
+4. konstruktory
+Konstruktor to metoda, która jest wołana automatycznie przez środowisko w chwili tworzenia (nie deklaracji a tworzenia) obiektu danej klasy (typu obiektowego)
+
+Gdy programista nie zdefiniuje żadnego konstruktora, to kompilator dodaje automatycznie konstruktor domyślny, który w PL/SQL przyjmuje argumenty zgodne co do liczby
+i odp. typów z atrybutami klasy, pozwalając na ich (atrybutów) inicjalizację.
+
+UWAGA:
+Konstruktor ZAWSZE nazywa się tak, jak typ obiektowy (klasa) dla której jest definiowany
+
+
+Deklaracja (w specyfikacji typu obiektowego)
+
+constructor function nazwa_typu_obiektowego(lista_parametrów_formalnych) return self as result,
+
+Definicja (w ciele typu obiektowego)
+
+constructor function nazwa_typu_obiektowego(lista_parametrów_formalnych) return self as result
+is
+...
+end;
+
+UWAGA:
+W konstruktorze, w przeciwieństwie do "zwykłej" metody, musi znaleźć się wywołanie
+return;
+
+przykład:
+
+create or replace type osoba as object (
+nazwisko varchar2(30),
+imie     varchar2(30),
+data_urodzenia date,
+constructor function osoba (p_nazwisko varchar2) return self as result,
+member function podajwiek return number );
+
+create or replace type body osoba as 
+ 
+ constructor function osoba (p_nazwisko varchar2) return self as result
+ is
+ begin
+ 	nazwisko := p_nazwisko;
+ 	imie := 'Nieznane';
+ 	data_urodzenia := sysdate;
+ 	return;
+ end;
+
+ member function podajwiek return number
+ is
+ begin
+    return trunc((sysdate-data_urodzenia)/365);
+ end;
+end;
+/
+
+declare
+	o osoba;
+	wiek number(7,2);
+begin
+    o := osoba('Kowalski');
+    wiek := o.podajwiek;
+    dbms_output.put_line(wiek);
+end;
+/
+
+zadanie
+1. utwórz typ obiektowy osoba, posiadający następujące atrybuty
+nazwisko varchar2(30)
+imie     varchar2(30)
+data_urodzenia varchar2(30)
+nr_pesel       varchar2(30)
+
+oraz metody
+zmien_nazwisko(nowe_nazwisko varchar2) -- ma odpowiadać za ustawienie wartości atrybutu nazwisko na nowe_nazwisko
+zmien_imie(nowe_imie varchar2) -- ma odpowiadać za ustawienie wartości atrybutu imie na nowe_imie
+podajinicjaly() return varchar2 -- ma zwracać inicjały osoby
+podajwiek() return number -- ma zwracać wiek danej osoby
+
+2. utworz tabelę obiektową t_osoby do składowania danych osób
+
+ 3. napisz procedurę składowaną copy_employees, która czytałaby dane pracowników z tabeli employees a następnie na podstawie każdego wiersza tworzyłaby obiekt
+typu osoba i wstawiała ten obiekt do tabeli osoby. Data urodzenia powinna być wyznaczana ze wzoru hire_date - 25 lat.
+
+zadania domowe
+1. zmodyfikuj typ obiektowy z zadania nr 1 dodając do niego konstruktor pozwalający na tworzenie obiektów tej klasy jedynie na podstawie nazwiska i imienia.
+Data urodzenia w takim przypadku byłaby ustawiona na bieżącą datę systemową, a PESEL na wartość 0000000000000 
+
+2. napisz procedurę składowaną w bazie danych, która akceptowałaby dwa parametry wejściowe P_LAST_NAME oraz P_FIRS_NAME typu VARCHAR2, na ich
+   podstawie tworzyłaby obiekt klasy osoba (poprzez wywołanie konstruktora zdefiniowanego w zadaniu nr 1) a nowo utworzony obiekt klasy osoba 
+   wstawiałaby do tabeli T_OSOBY
+   
+ 
+
+
+
+
+
+
+
+
+
+
+

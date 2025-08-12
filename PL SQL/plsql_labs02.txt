@@ -1,0 +1,220 @@
+Witold Świerzy
+wswier@sgh.waw.pl
+-----------------
+https://www.e-sgh.pl/witold_swierzy/236480-0639
+
+
+1. procedury 
+Rozkaz tworzenia procedury:
+CREATE [OR REPLACE] PROCEDURE nazwa_procedury [(lista_parametrów)]
+IS
+	sekcja deklaracji zmiennych lokalnych
+BEGIN
+	sekcja wykonywalna
+END;
+/
+
+lista_parametrów:= definicja_parametru1 [, definicja_parametru2 [, definicja_parametru3 ...]]
+
+definicja_parametruN := nazwa [IN|OUT|IN OUT] typ [:= wartość_domyślna]
+
+IN     - parametr wejściowy, wewn. procedury zachowuje się jak stała (może być wykorzystywany jako źródło wartości, nie można do niego przypisywać nowych wartości)
+         rzeczywisty parametr wywołania może być literałem, zmienną, wyrażeniem. domyślny
+ 
+OUT    - parametr wyjściowy, wewn. procedury zachowuje się jak zmienna niezainicjalizowana (można przypisywać do niego nowe wartości, nie może być stosowany jako źródło wartości)
+         rzeczywisty parametr wywołania musi być zmienną
+
+IN OUT - parametr wejściowo-wyjściowy. wewn. procedury zachowuje się jak zmienna zainicjalizowana (można go stosować jako źródło wartości, można do niego przypisywać nowe wartości)
+	 rzeczywisty parametr wywołania musi być zmienną
+
+wartość domyślna jest wykorzystywana wtedy, gdy przy wywołaniu procedury parametr zostanie pominięty
+
+przykład:
+
+create or replace procedure ins_new_dept(p_deptno number, p_dname varchar2 := 'NONAME')
+is
+begin
+   insert into departments (department_id, department_name)
+   values (p_deptno, p_dname);
+   
+   commit;
+end;
+/
+
+przykładowe wywołanie procedury w środowisku iAcademy:
+
+begin
+	ins_new_dept(100,'Kadry');
+end;
+
+lub
+
+begin
+	ins_new_dept(110);
+end;
+
+2. funkcje
+rozkaz tworzenia funkcji:
+
+CREATE [OR REPLACE] FUNCTION nazwa_funkcji[(lista_parametrów)] RETURN typ_wyniku
+IS
+	sekcja_deklaracji_zmiennych
+BEGIN
+	sekcja_wykonywalna
+END;
+/
+
+w sekcji wykonywalnej funkcji MUSI się znajdować przynajmniej jedna instrukcja RETURN wynik - jest to instrukcja wyjścia, zwracająca wynik funkcji.
+
+przykład:
+
+create or replace function get_increased_salary(p_salary number, p_percent number := 10) return number
+is
+begin
+	return p_salary + p_salary*p_percent/100;
+end;
+/
+
+
+przykład wywołania funkcji w środowisku iAcademy
+
+declare
+	v_result number(10);
+begin
+	v_result := get_increased_salary(3000,12);
+	dbms_output.put_line('Increased salary is equal to: '||v_result);
+end;
+
+lub
+
+
+declare
+	v_result number(10);
+begin
+	v_result := get_increased_salary(3000);
+	dbms_output.put_line('Increased salary is equal to: '||v_result);
+end;
+
+UWAGA
+-----
+Przy deklarowaniu parametrów procedur i funkcji oraz typów wyniku funkcji NIE PODAJEMY zakresów.
+Czyli np. taka definicja parametru jest poprawna:
+  p_parametr NUMBER
+podczas, gdy poniższa nie jest poprawna:
+  p_parametr NUMBER(10)
+
+Niektóre funkcje PL/SQL mogą być również wywoływane w rozkazach SQL, na przykład:
+
+select employee_id, last_name, first_name, salary, get_increased_salary(salary,13)
+from employees
+where get_increased_salary(salary,20) < 5000;
+
+Warunki:
+1. funkcja PL/SQL może być wołana w następujących poleceniach i klauzulach
+	kl. SELECT rozkazu SELECT
+	kl. WHERE
+	kl. GROUP BY rozkazu SELECT
+	kl. VALUES rozkazu INSERT
+	kl. SET rozkazu UPDATE
+
+2. typ wyniku funkcji musi być typem SQL
+3. typy argumentów funkcji muszą być typami SQL
+4. funkcja wołana w rozkazach DML (INSERT, UPDATE, DELETE) nie może zmieniać zawartości tabel, na których operuje wywoływane polecenie
+5. funkcja wołana w rozkazach DML + SELECT nie może zawierać poleceń sterujących transakcjami (COMMIT, ROLLBACK)
+6. funkcja wołana w zrównoleglonych rozkazach SQL nie może modyfikować JAKICHKOLWIEK tabel
+
+3. instrukcja warunkowa IF
+składnia
+	IF warunek1 THEN
+		sekwencja_instrukcji_1;
+	[ELSIF warunek2 THEN
+	        sekwencja_instrukcji_2;
+        [ELSIF warunek3 THEN
+	        sekwencja_instrukcji_3;
+        ...
+        [ELSE
+                sekwencja_instrukcji_N]]];
+        END IF;
+
+
+W budowie warunków wykorzystujemy operatory porównania znane z SQL:
+1. arytmetyczne
+   =,>,<,<>,<=,>=
+2. IS NULL, IS NOT NULL
+3. LIKE, NOT LIKE
+4. IN, NOT IN
+
+5. logiczne (AND, OR, NOT)
+   1. NOT
+   2. AND
+   3. OR
+   ()
+   TRUE AND NULL <=> NULL
+   FALSE AND NULL <=> FALSE
+
+   TRUE OR NULL <=> TRUE
+   FALSE OR NULL <=> NULL
+  
+   NOT NULL <=> NULL
+
+przykład:
+create or replace function fun1(p_param varchar2) return varchar2 is 
+begin
+  if p_param is null then
+    return 'NULL';
+  elsif p_param like 'S%' then
+    return 'S';
+  elsif p_param in ('a','b','c') then
+    return 'abc';
+  else
+    return 'other value';
+  end if;
+end;
+
+
+rejestracja konta IAcademy:
+https://iacademy3.oracle.com/ords3/f?p=814:1:9417123822695:::::
+
+zadania:
+1. napisz funkcję, która
+   - przyjmować będzie dwa parametry: p_job_id typu VARCHAR2, p_salary NUMBER
+   - funkcja ma wyliczać i zwracać nową pensję pracownika w następujący sposób
+     a) jeśli jego stanowisko pracy (p_job_id) jest równe 'ST_MAN', to powinna zwracać p_salary powiększone o 10%
+     b) jeśli jego stanowisko pracy jest równe 'ST_CLERK', to powinna zwracać p_salary powiększone o 5%
+     c) w pozostałych przypadkach funkcja powinna zwracać p_salary powiększone o 15%
+
+     wywołaj tą funkcję w rozkazie SELECT odczytującym imię (first_name), nazwisko (last_name), pensję (salary) oraz nową, podwyższoną poprzez wywołanie pow. funkcji pensję pracownika
+
+2. napisz procedurę, której zadaniem będzie dodanie dwóch liczb zespolonych a+bi oraz c+di
+   procedura ta posiadać będzie 6 parametrów
+   - część rzeczywista pierwszej liczby zespolonej, parametr IN
+   - część urojona pierwszej liczby zespolonej, parametr IN
+   - część rzeczywista drugiej liczby zespolonej, parametr IN
+   - część urojona drugiej liczby zespolonej, parametr IN
+   - część rzeczywista wyniku, parametr OUT
+   - część urojona wyniku, parametr OUT
+
+   wywołaj tą procedurę w anonimowym bloku PL/SQL, i wydrukuj wynik, stosując DBMS_OUTPUT.PUT_LINE
+   wskazówka:
+   blok ten musi mieć zadeklarowane dwie zmenne lokalne, które będą piątym i szóstym parametrem wywołania owej procedury
+   
+zadanie domowe
+1. napisz funkcję, której zadaniem będzie wyliczenie procenta podwyżki danego pracownika
+   funkcja powinna przyjmować 1 parametr IN typu VARCHAR2, w którym można będzie przekazać skrót nazwy stanowiska pracy
+   i zwracać wartość liczbową reprezentującą procent podwyżki
+   wyliczenie podwyżki ma zostać zrealizowane wg następujących reguł:
+   a. jeśli przekazane stanowisko to ST_MAN (manager) to funkcja powinna zwracać wartość 10
+   b. jeśli przekazane stanowisko to IT_PROG to funkcja powinna zwracać wartość 20
+   c. w pozostałych przypadkach funkcja powinna zwracać wartość 5
+   
+2. napisz funkcję, której zadaniem będzie zwrócenie roku przejścia na emeryturę pracownika
+   funkcja powinna przyjmować parametr typu DATE reprezentujący datę zatrudnienia pracownika
+   oraz parametr typu VARCHAR2 reprezentujący skrót nazwy stanowiska pracy pracownika
+   i zwracać wartość typu liczbowego reprezentującą ROK przejścia na emeryturę wg wzoru: 
+   1. rok zatrudnienia uzyskany z daty zatrudnienia + 35 lat pracy dla wszystkich stanowisk oprócz SA_REP i ST_PROG
+   2. rok zatrudnienia uzyskany z daty zatrudnienia + 25 lat pracy dla ST_PROG
+   3. rok zatrudnienia uzyskany z daty zatrudnienia + 40 lat pracy dla ST_PROG
+   
+
+
+

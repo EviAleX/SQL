@@ -1,0 +1,92 @@
+zadania
+
+1. Utwórz wyzwalacz wierszowy związany z operacjami DML na tabeli EMPLOYEES, który będzie ochraniał jej zawartość wg następujących reguł
+   - niedopuszczalne sa obniżki pensji
+   - niedopuszczalne są podwyżki pensji o więcej, niż 10%
+   - niedopuszczalne jest zatrudnianie pracownika bez podawania jego pensji lub z pensją większą, niż najniższa pensja na danym stanowisku
+   - niedopuszczalne są operacje DELETE poza ostatnim dniem miesiąca
+   
+create or replace trigger tr_emp
+before insert or update or delete on employees 
+for each row
+declare
+   v_min_sal employees.salary%type;
+begin
+   if inserting then
+      select min(salary)
+      into v_min_sal
+      from employees
+      where job_id = :new.job_id;
+      
+      if :new.salary is null or :new.salary > v_min_sal then
+         raise_application_error(-20001,'Nie podano pensji lub podana pensja jest zbyt wysoka');
+      end if;
+   elsif updating then
+      if :new.salary < :old.salary or :new.salary > :old.salary*1.1 then
+         raise_application_error(-20002,'Nowa pensja jest niższa od starej lub wyższa od starej o ponad 10%');
+      end if;
+   elsif deleting then
+      if sysdate <> last_day(sysdate) then
+         raise_application_error(-20003,'Zwolnienia są dopuszczalne jedynie ostatniego dnia każdego miesiąca');
+      end if;
+   end if;
+end;
+
+
+   
+   
+   
+2. Utwórz perspektywę V_EMP_DEPT, która będzie pokazywała numer departamentu i liczbę zatrudnionych w nim pracowników
+
+   Utwórz wyzwalacz INSTEAD OF na perspektywie V_EMP_DEPT, który będzie umożliwiał wykonanie na niej operacji DELETE
+   operacja ta będzie oznaczała usunięcie wszystkich pracowników z zadanego departamentu
+
+   create or replace view v_emp_dept
+   as
+   select department_id, count(*) no_of_emps
+   from employees
+   group by department_id;
+
+   create or replace trigger tr_v_emp_dept
+   instead of delete on v_emp_dept
+   for each row
+   begin
+      delete from employees
+      where department_id = :old.department_id;
+   end;
+   
+3. Wstaw nowy wiersz do tabeli DEPARTMENTS reprezentujący departament o nazwie DELETED_DEPT oraz ID równym 0
+   Utwórz wyzwalacz wierszowy BEFORE związany z operacją DELETE na tabeli DEPARTMENTS.
+   Wyzwalacz ten ma implementować następujące dwie reguły biznesowe:
+   1. gdy ktoś próbuje usunąć departament 0 to wyzwalacz zgłasza wyjątek zdefiniowany przez programistę INVALID_DEPT_OPERATION
+   2. w przypadku, gdy ktoś próbuje usunąć inny departament to wszystkich pracujących tam pracowników przesuwa się do departamentu 0
+   
+   insert into departments(department_id, department_name) values (0,'DELETED_DEPT');
+   
+   create or replace trigger bef_delete_dept_trg
+   before delete on departments
+   for each row
+   begin
+   	if :old.department_id = 0 then
+		raise_application_error(20000,'INVALID_DEPT_OPERATION');
+	else
+		update employees
+		set department_id = 0
+		where department_id = :old.department_id;
+	end if;
+   end;
+   /
+   
+   
+4. Utwórz wyzwalacz wierszowy BEFORE związany z poleceniem INSERT na tabeli JOB_GRADES
+   Wyzwalacz ten ma nie dopuszczać do wstawiania wierszy z wartościami HIGHEST_SAL większymi, niż 15000
+   
+   create or replace trigger bef_insert_grades_trg
+   before insert on job_grades
+   for each row
+   begin
+   	if :new.highest_sal > 15000 then
+		raise_application_error(20001,'HIGHEST_SAL greater than 15000');
+	end if;
+   end;
+   /

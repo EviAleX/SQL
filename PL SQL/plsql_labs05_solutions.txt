@@ -1,0 +1,106 @@
+Zadanie
+   napisz procedurę, której zadaniem będzie ustawienie nowej pensji pracownika
+      procedura ta ma przyjmować następujące parametry
+      a) P_LAST_NAME VARCHAR2 - nazwisko pracownika
+      b) P_NEW_SALARY NUMBER  - jego nową pensję
+      Procedura ma obsługiwać następujące sytuacje wyjątkowe
+      - NEW_SAL_TOO_LOW - jesli nowa pensja jest mniejsza od starej - wyjątek zdefiniowany przez programistę
+                          w takiej sytuacji procedura ma drukować komunikat Nowa pensja mniejsza od starej oraz wycofywać transakcję
+      - NO_DATA_FOUND   - wyjątek zdefiniowany przez programistę - jeśli pracownik o zadanym nazwisku nie istnieje
+                          w takiej sytuacji procedura ma drukować komunikat 'Nieistniejący pracownik' oraz wycofywać transakcję
+                          
+                          
+     create or replace procedure set_new_salary(p_last_name varchar2, p_new_salary number)
+     is
+        new_sal_too_low exception;
+        v_sal number(7,2);
+     begin
+        select salary 
+        into v_sal
+        from employees
+        where last_name = p_last_name;
+        
+        if v_sal > p_new_salary then
+           raise new_sal_too_low;
+        end if;
+        
+        update employees
+        set salary = p_new_salary
+        where last_name = p_last_name;
+        
+        commit;
+        
+     exception
+        when new_sal_too_low then
+           rollback;
+           dbms_output.put_line('Nowa pensja mniejsza od starej oraz wycofywać transakcję');
+           
+        when no_data_found then
+           rollback;
+           dbms_output.put_line('Nieistniejący pracownik');
+     end;
+
+Zadania domowe
+1.
+     Uzupełnij kod pow. procedury o obsługę wyjątków
+     TOO_MANY_ROWS (wyjątek predefiniowany, jeśli istnieje więcej pracowników o podanym nazwisku)
+     NEW_SALARY_LOWER_THAN_100 (wyjątek zdefiniowany przez programistę, jeśli nowa pensja jest mniejsza, niż 100)
+     
+     
+     create or replace procedure set_new_salary(p_last_name varchar2, p_new_salary number)
+     is
+        new_sal_too_low exception;
+        new_salary_lower_than_100 exception;
+        v_sal number(7,2);
+     begin
+        if p_new_salary < 100 then
+           raise new_salary_lower_than_100;
+        end if;
+     
+     
+        select salary 
+        into v_sal
+        from employees
+        where last_name = p_last_name;
+        
+        if v_sal > p_new_salary then
+           raise new_sal_too_low;
+        end if;
+        
+        update employees
+        set salary = p_new_salary
+        where last_name = p_last_name;
+        
+        commit;
+        
+     exception
+        when new_sal_too_low then
+           rollback;
+           dbms_output.put_line('Nowa pensja mniejsza od starej oraz wycofywać transakcję');
+           
+       when new_salary_lower_than_100 then
+           rollback;
+           dbms_output.put_line('Nowa pensja mniejsza od 100');
+           
+       when too_many_rows then
+           rollback;
+           dbms_output.put_line('zbyt wielu pracowników o podanym nazwisku');           
+           
+        when no_data_found then
+           rollback;
+           dbms_output.put_line('Nieistniejący pracownik');
+     end;
+
+2. create or replace procedure ins_new_dept(p_dept_id number, p_dept_name varchar2)
+   is
+   begin
+   		insert into departments (department_id, department_name)
+		values (p_dept_id, p_dept_name);
+		
+		commit;
+		
+	exception
+		when dup_val_on_index then
+			dbms_output.put_line('Próba wstawienia zduplikowanej wartości DEPARTMENT_ID');
+	end;
+	/

@@ -1,0 +1,210 @@
+Dziedziczenie i polimorfizm
+
+1. dziedziczenie
+Dziedziczenie jest mechanizmem pozwalającym na budowanie specjalizowanych klas na podstawie wcześniej zdefiniowanych klas ogólniejszych.
+W PL/SQL (podobnie do Javy, ale w przeciwieństwie do np. C++) mamy do czynienia z dziedziczeniem jednokrotnym, tzn. każda podklasa ma dokładnie jedną nadklasę.
+Oczywiście dowolna nadklasa może mieć DOWOLNĄ liczbę podklas. Dziedziczenie zatem w PL/SQL pozwala na budowę hierarchii klas.
+
+Podklasa wywiedziona z nadklasy DZIEDZICZY po niej wszystkie atrybuty i metody, może również posiadać własne atrybuty i metody nie występujące w nadklasie.
+
+przykład 
+osoba ---> student
+
+aby utworzyć nadklasę, która będzie mogła być wykorzystywana do budowy podklas, należy ją zadeklarować z opcją NOT FINAL
+składnia z przykładem:
+
+create or replace type osoba as object (
+nazwisko varchar2(30),
+imie     varchar2(30),
+data_urodzenia date,
+constructor function osoba (p_nazwisko varchar2) return self as result,
+member function podajwiek return number )
+NOT FINAL;
+
+
+create or replace type body osoba as 
+ 
+ constructor function osoba (p_nazwisko varchar2) return self as result
+ is
+ begin
+ 	nazwisko := p_nazwisko;
+ 	imie := 'Nieznane';
+ 	data_urodzenia := sysdate;
+ 	return;
+ end;
+
+ member function podajwiek return number
+ is
+ begin
+    return trunc((sysdate-data_urodzenia)/365);
+ end;
+end;
+/
+
+create or replace type student under osoba (
+nr_indeksu number(10),
+constructor function student (p_nazwisko varchar2, p_imie varchar2, p_nr_indeksu number) return self as result,
+member function podaj_nr_indeksu return number
+)
+
+create or replace type body student as 
+   constructor function student (p_nazwisko varchar2, p_imie varchar2, p_nr_indeksu number) return self as result
+   is
+   begin
+      nazwisko := p_nazwisko;
+      imie := p_imie;
+      nr_indeksu := p_nr_indeksu;
+      data_urodzenia := sysdate;
+      return;
+   end;
+   
+   member function podaj_nr_indeksu return number
+   is
+   begin
+     return nr_indeksu;
+   end;
+end;
+/
+
+
+declare
+	o osoba;
+	s student;
+	wiek number(7,2);
+	nr_indeksu number(10);
+begin
+    s := student('Kowalski','Jan',1);
+    wiek := s.podajwiek;
+    nr_indeksu := s.podaj_nr_indeksu;
+    dbms_output.put_line(wiek);
+    dbms_output.put_line(nr_indeksu);
+end;
+/
+
+2. Polimorfizm.
+Polimorfizm jest mechanizmem pozwalającym na posługiwanie się ujednoliconym interfejsem, bez względu na którym "poziomie" dziedziczenia faktycznie się znajdujemy.
+
+Rozpatrzmy następujący przykład:
+
+create or replace type osoba as object (
+nazwisko varchar2(30),
+imie     varchar2(30),
+data_urodzenia date,
+constructor function osoba (p_nazwisko varchar2) return self as result,
+member function podajwiek return number,
+NOT FINAL member function podaj_kategorie return varchar2 )
+NOT FINAL;
+
+create or replace type body osoba as 
+ 
+ constructor function osoba (p_nazwisko varchar2) return self as result
+ is
+ begin
+ 	nazwisko := p_nazwisko;
+ 	imie := 'Nieznane';
+ 	data_urodzenia := sysdate;
+ 	return;
+ end;
+
+ member function podajwiek return number
+ is
+ begin
+    return trunc((sysdate-data_urodzenia)/365);
+ end;
+ 
+ member function podaj_kategorie return varchar2
+ is
+ begin
+    return 'ogólna';
+ end;
+ 
+end;
+/
+
+create or replace type student under osoba (
+nr_indeksu number(10),
+constructor function student (p_nazwisko varchar2, p_imie varchar2, p_nr_indeksu number) return self as result,
+member function podaj_nr_indeksu return number,
+OVERRIDING member function podaj_kategorie return varchar2
+);
+
+create or replace type body student as 
+   constructor function student (p_nazwisko varchar2, p_imie varchar2, p_nr_indeksu number) return self as result
+   is
+   begin
+      nazwisko := p_nazwisko;
+      imie := p_imie;
+      nr_indeksu := p_nr_indeksu;
+      data_urodzenia := sysdate;
+      return;
+   end;
+   
+   member function podaj_nr_indeksu return number
+   is
+   begin
+     return nr_indeksu;
+   end;
+   
+   OVERRIDING member function podaj_kategorie return varchar2
+   is
+   begin
+      return 'student';
+   end;
+   
+end;
+/
+
+
+create or replace procedure drukuj_dane (p_o osoba)
+is
+   v_wiek number(10);
+   v_kategoria varchar2(100);
+begin
+   v_wiek := p_o.podajwiek;
+   v_kategoria := p_o.podaj_kategorie;
+   dbms_output.put_line(v_wiek);
+   dbms_output.put_line(v_kategoria);
+end;
+/
+
+declare 
+   o osoba;
+   s student;
+begin
+    o := osoba('Kowalski');
+    s := student('Nowak','Jan',2);
+    
+   drukuj_dane(o);
+   drukuj_dane(s);
+end;
+/
+
+
+Zadania
+1. zredefiniuj typ obiektowy osoba zdefiniowany w zadaniach z ub. tygodnia. tak, aby można było z niego dziedziczyć
+   w typie tym zadeklaruj i zdefiniuj metodę not final 
+       podaj_zrodlo_dochodow return varchar2
+   w przypadku typu osoba, metoda ta powinna zwracać statyczny napis 'BRAK INFORMACJI'
+   
+2. utwórz podtyp typu osoba o nazwie pracownik
+   w tym typie metoda podaj_zrodlo_dochodow powinna zwracać statyczny napis 'PRACA ZAROBKOWA'
+   
+3. utwórz podtyp typu osoba o nazwie uczen
+   w tym typie metoda podaj_zrodlo_dochodow powinna zwracać statyczny napis 'RODZICE'
+   
+4. utwórz procedurę drukuj_dane_osoby, której zadaniem będzie drukowanie nazwiska i źródła dochodów danej osoby
+   procedura powinna przyjmować pojedynczy parametr będący obiektem klasy osoba
+   procedura powinna wołać jego metodę podaj_zrodlo_dochodow i podstawiać jej wynik do zmiennej lokalnej v_zrodlo typu varchar2
+   procedura powinna drukować nazwisko i zrodlo dochodów w formacie NAZWISKO: ZRODLO_DOCHODOW
+   
+5. utwórz anonimowy blok PL/SQL w którym 
+   - zadeklarujesz i zainicjujesz zmienną obiektową typu pracownik
+   - zadeklarujesz i zainicjujesz zmienną obiektową typu uczen
+   - wywołasz procedurę drukuj_dane_osoby raz z jednym obiektem przekazywanym jako parametr a raz z drugim
+   
+
+
+
+
+
+

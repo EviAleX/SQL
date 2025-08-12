@@ -1,0 +1,92 @@
+
+
+zadania:
+1. napisz funkcję, która
+   - przyjmować będzie dwa parametry: p_job_id typu VARCHAR2, p_salary NUMBER
+   - funkcja ma wyliczać i zwracać nową pensję pracownika w następujący sposób
+     a) jeśli jego stanowisko pracy (p_job_id) jest równe 'ST_MAN', to powinna zwracać p_salary powiększone o 10%
+     b) jeśli jego stanowisko pracy jest równe 'ST_CLERK', to powinna zwracać p_salary powiększone o 5%
+     c) w pozostałych przypadkach funkcja powinna zwracać p_salary powiększone o 15%
+
+     wywołaj tą funkcję w rozkazie SELECT odczytującym imię (first_name), nazwisko (last_name), pensję (salary) oraz nową, podwyższoną poprzez wywołanie pow. funkcji pensję pracownika
+   
+     create or replace function get_new_salary(p_job_id varchar2, p_salary number) return number
+     is
+        v_new_sal number(7,2);
+     begin
+        if p_job_id = 'ST_MAN' then
+           v_new_sal := p_salary*1.1;
+        elsif p_job_id = 'ST_CLERK' then
+           v_new_sal := p_salary*1.05;
+        else
+           v_new_sal := p_salary*1.15;
+        end if;
+        
+        return v_new_sal;
+      end;
+
+
+
+2. napisz procedurę, której zadaniem będzie dodanie dwóch liczb zespolonych a+bi oraz c+di
+   procedura ta posiadać będzie 6 parametrów
+   - część rzeczywista pierwszej liczby zespolonej, parametr IN
+   - część urojona pierwszej liczby zespolonej, parametr IN
+   - część rzeczywista drugiej liczby zespolonej, parametr IN
+   - część urojona drugiej liczby zespolonej, parametr IN
+   - część rzeczywista wyniku, parametr OUT
+   - część urojona wyniku, parametr OUT
+
+   wywołaj tą procedurę w anonimowym bloku PL/SQL, i wydrukuj wynik, stosując DBMS_OUTPUT.PUT_LINE
+   wskazówka:
+   blok ten musi mieć zadeklarowane dwie zmenne lokalne, które będą piątym i szóstym parametrem wywołania owej procedury
+   
+   create or replace procedure add_complex(re1 number, im1 number, re2 number, im2 number, re3 OUT number, im3 OUT number)
+   is
+   begin
+      re3 := re1 + re2;
+      im3 := im1 + im2;
+   end;
+   
+zadanie domowe
+1. napisz funkcję, której zadaniem będzie wyliczenie procenta podwyżki danego pracownika
+   funkcja powinna przyjmować 1 parametr IN typu VARCHAR2, w którym można będzie przekazać skrót nazwy stanowiska pracy
+   i zwracać wartość liczbową reprezentującą procent podwyżki
+   wyliczenie podwyżki ma zostać zrealizowane wg następujących reguł:
+   a. jeśli przekazane stanowisko to ST_MAN (manager) to funkcja powinna zwracać wartość 10
+   b. jeśli przekazane stanowisko to IT_PROG to funkcja powinna zwracać wartość 20
+   c. w pozostałych przypadkach funkcja powinna zwracać wartość 5
+
+create or replace function get_raise_percent(p_job_id varchar2) return number
+is
+begin
+	   if p_job_id = 'ST_MAN' then
+	   		return 10;
+	   elsif p_job_id = 'IT_PROG' then
+	   		return 20;
+	   end if;
+	   return 5;
+end;
+/ 
+   
+2. napisz funkcję, której zadaniem będzie zwrócenie roku przejścia na emeryturę pracownika
+   funkcja powinna przyjmować parametr typu DATE reprezentujący datę zatrudnienia pracownika
+   oraz parametr typu VARCHAR2 reprezentujący skrót nazwy stanowiska pracy pracownika
+   i zwracać wartość typu liczbowego reprezentującą ROK przejścia na emeryturę wg wzoru: 
+   1. rok zatrudnienia uzyskany z daty zatrudnienia + 35 lat pracy dla wszystkich stanowisk oprócz SA_REP i ST_PROG
+   2. rok zatrudnienia uzyskany z daty zatrudnienia + 25 lat pracy dla ST_PROG
+   3. rok zatrudnienia uzyskany z daty zatrudnienia + 40 lat pracy dla SA_REP
+
+create or replace function get_year_of_retirement(p_hire_date date, p_job_id varchar2) return number
+is
+	v_hire_year number(4) := to_number(to_char(p_job_id,'YYYY'));
+begin
+	if p_job_id = 'SA_REP' then
+		return v_hire_year+40;
+	elsif p_job_id = 'ST_PROG' then
+		return v_hire_year+25;
+	end if;
+	return v_hire_year+35;
+end;
+/
+
+

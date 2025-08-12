@@ -1,0 +1,270 @@
+Witold Świerzy
+wswier@sgh.waw.pl
+-----------------
+https://www.e-sgh.pl/witold_swierzy/236480-0639
+
+
+1. SQL w PL/SQLu
+   W programach PL/SQL można umieszczać bez żadnych zmian składniowych następujące polecenia SQL:
+   INSERT, UPDATE, DELETE, COMMIT, ROLLBACK, SAVEPOINT
+   Uwaga:
+   program PL/SQL NIE JEST jednostką przetwarzania transakcyjnego
+
+   Dodatkowo, z pewnymi zmianami, można stosować polecenie SELECT
+
+   składnia:
+   SELECT kolumna1, kolumna2, ... ,kolumnaN
+   INTO   zmienna1, zmienna2, ... ,zmiennaN
+   FROM ...
+   [pozostałe klauzule polecenia SELECT]
+
+   uwagi:
+   a. polecenie SELECT INTO MUSI zwracać dokładnie 1 wiersz, w przeciwnym przypadku uzyskamy błąd wykonania
+      - jesli zwraca więcej, niż 1 wiersz: TOO_MANY_ROWS
+      - jeśli nie zwraca żadnego wiersza: NO_DATA_FOUND
+
+   b. typy i liczba zmiennych "zmiennaK" w kl. INTO muszą pokrywać się co do liczby i typów z wyrażeniami w kl. SELECT
+
+   c. w poleceniach SQL umieszczonych w programach PL/SQL można stosować:
+      - zmienne PL/SQL
+      - parametry procedur i funkcji
+      wszędzie tam, gdzie dopuszczalne są literały (np. w warunkach w kl. WHERE, w kl. SET polecenia UPDATE, w kl. VALUES pol. INSERT, etc)
+
+   W programach PL/SQL NIE MOŻNA umieszczać poleceń DDL i DCL (CREATE, ALTER, DROP, GRANT, REVOKE). Aby ominąć to ograniczenie, stosuje się tzw. dynamiczny SQL
+
+  przykłady:
+
+  create or replace function get_max_sal(p_deptno number) return number
+  is
+     v_max_sal number(10);
+  begin
+     select max(salary)
+     into v_max_sal
+     from employees
+     where department_id = p_deptno;
+
+     return v_max_sal;
+  end;
+
+  create or replace procedure set_new_salary(p_employee_id number, p_new_sal number)
+  is
+  begin
+     update employees
+     set salary = p_new_sal
+     where employee_id = p_employee_id;
+
+     commit;
+  end;
+
+2. Tablice i rekordy PL/SQL
+   Tablice i rekordy w PL/SQL są zagregowanymi typami danych (typami, których zmienne pozwalają na przechowywanie więcej, niż 1 wartości)
+   Nie należy mylić tablic i rekordów PL/SQL z tabelami i wierszami w bazie danych.
+   Deklaracja zmiennych tych typów jest zawsze dwuetapowa
+     - deklaracja typu
+     - deklaracja zmiennych
+   a) tablice
+      Tablice w PL/SQL mają ustalony jedynie maks. rozmiar (2^32), są więc strukturami dynamicznymi (czyli takimi, które mogą zmieniać swój rozmiar podczas wykonywania programu)
+      Wszystkie elementy tablicy są dokładnie tego samego typu, określanego na etapie definiowania typu tablicowego. Dostęp do danego elementu jest realizowany przy pomocy indeksu
+      tablicy (indeks tablicy określa "numer" elementu w tablicy).
+      W przeciwieństwie do innych języków programowania nie ma tablic wielowymiarowych, natomiast można zadeklarować tablicę tablic
+
+      deklaracja typu
+      TYPE nazwa_typu_tablicowego IS TABLE OF nazwa_typu_elementu INDEX BY BINARY_INTEGER | VARCHAR2(zakres);
+
+      deklaracja zmiennej
+      zmienna_tablicowa typ_tablicowy;
+
+      odwołanie do N-tego elementu tablicy
+      zmienna_tablicowa(N)
+
+      przykład:
+      create or replace procedure drukuj_liczby_naturalne (p_limit number)
+      is
+         type t_liczby_naturalne is table of number(10) index by binary_integer;   -- deklaracja TYPU T_LICZBY_NATURALNE
+ 
+         v_liczby_naturalne t_liczby_naturalne;                                     -- deklaracja ZMIENNEJ V_LICZBY_NATURALNE
+      begin
+         for i in 1..p_limit loop   --przykład pętli iteracyjnej FOR
+             v_liczby_naturalne(i) := i;
+         end loop;
+
+         for i in 1..p_limit loop
+             dbms_output.put_line(v_liczby_naturalne(i));
+         end loop;
+      end;
+
+    Ponieważ zmienne tablicowe mogą zmieniać swój rozmiar w trakcie wykonywania programu, w szczególności mogą być "dziurawe",
+    każda zmienna wyposażona jest w dodatkowe atrybuty, pozwalające na sprawdzenie
+    a) czy I-ty element istnieje zmienna_tablicowa.exists(i)
+    b) który element ma najmniejszy indeks: zmienna_tablicowa.first
+    c) który element ma największy indeks: zmienna_tablicowa.last
+    d) jaki jest indeks następnego istniejącego elementu po I-tym: zmienna_tablicowa.next(i)
+    e) jaki jest indeks poprzedniego istniejącego elementu względem I-tego: zmienna_tablicoway.prior(i)
+    f) jaka jest łączna liczba elementów w tablicy: zmienna_tablicowa.count
+
+    przykład:
+    create or replace procedure drukuj_liczby_naturalne (p_limit number)
+      is
+         type t_liczby_naturalne is table of number(10) index by binary_integer;   -- deklaracja TYPU T_LICZBY_NATURALNE
+         v_liczby_naturalne t_liczby_naturalne;                                    -- deklaracja ZMIENNEJ V_LICZBY_NATURALNE
+      begin
+         for i in 1..p_limit loop   --przykład pętli iteracyjnej FOR
+             v_liczby_naturalne(i) := i;
+         end loop;
+
+         for i in 1..p_limit loop
+             dbms_output.put_line(v_liczby_naturalne(i));
+         end loop;
+
+         dbms_output.put_line(v_liczby_naturalne.first);
+         dbms_output.put_line(v_liczby_naturalne.last);
+         dbms_output.put_line(v_liczby_naturalne.count);
+      end;
+
+  
+   b) rekordy
+   rekord PL/SQL jest zagregowaną strukturą danych składającą się z pól. Jest podobny do rekordów w Pascalu lub struktur w C/C++
+   Każde pole rekordu może mieć różny typ danych, jest identyfikowane poprzez swoją nazwę (nazwa pola musi być unikalna w ramach typu rekordowego)
+
+   deklaracja typu
+   TYPE typ_rekordowy IS RECORD ( nazwa_pola1 typ_pola1 [:=wartość_domyślna],
+                                  nazwa_pola2 typ_pola2 [:=wartość_domyślna],
+                                  ...
+                                  nazwa_polaN typ_polaN [:=wartość_domyślna] );
+
+   deklaracja zmiennej:
+   zmienna_rekordowa typ_rekordowy;
+
+   odwoływanie się do pól rekordów (notacja kropkowa): zmienna_rekordowa.nazwa_pola
+
+   Uwaga: w poleceniach INSERT i SELECT INTO można posługiwać się całymi rekordami
+
+   przykład:
+   create or replace procedure ins_new_dept(p_deptno number, p_dname varchar2, p_manager_id number, p_location_id number)
+   is
+      type t_dept_record is record (department_id   number(4),              -- deklaracja typu rekordowego T_DEPT_RECORD
+                               department_name varchar2(30),
+                               manager_id      number(6),
+                               location_id     number(4) );
+     v_dept_record t_dept_record;                                      -- deklaracja zmiennej rekordowej V_DEPT_RECORD
+   begin
+     v_dept_record.department_id   := p_deptno;
+     v_dept_record.department_name := p_dname;
+     v_dept_record.manager_id      := p_manager_id;
+     v_dept_record.location_id     := p_location_id;
+
+     insert into departments values v_dept_record;                       -- wstawiamy od razu cały rekord, zwróć uwagę na brak nawiasów okrągłych po kl. VALUES
+
+     commit;
+   end;
+
+   Uproszczona deklaracja rekordów na podstawie struktury tabeli:
+   zmienna_rekordowa tabela_bazy_danych%rowtype;
+ 
+   przykład:
+   create or replace function get_salary(p_emp_id number) return number
+   is
+      v_employee employees%rowtype;     -- v_employee ma strukturę (pola i ich typy) odziedziczone po tabebli bazy danych EMPLOYEES
+   begin
+      select *
+      into v_employee
+      from employees
+      where employee_id = p_emp_id;
+
+      return v_employee.salary;
+   end;
+ 
+  
+3. Pętle
+   Pętle pozwalają na wielokrotne wykonywanie tej samej sekwencji instrukcji
+   W PL/SQLu rozróżniamy następujące typy pętli
+   a) podstawowa
+      składnia:
+      LOOP
+          sekwencja_instrukcji
+      END LOOP;
+      
+      w najbardziej podstawowej wersji pętla ta jest nieskończona, dlatego zawsze należy w niej umieścić wywołanie instrukcji
+      EXIT WHEN warunek;
+
+   przykład: drukowanie kwadratów liczb naturalnych:
+
+   create or replace procedure drukuj_kwadraty(p_limit number)
+   is
+      i number(10) := 1;
+   begin
+      loop
+          exit when i > p_limit;
+          dbms_output.put_line(i*i);
+          i := i + 1;
+      end loop;
+   end;
+
+     
+   b) FOR - pętla iteracyjna
+      FOR i IN dolna_granica..gorna_granica [REVERSE] LOOP
+          sekwencja_instrukcji
+      END LOOP;
+
+   - nie jest konieczna inkrementacja indeksu
+   - nie jest konieczna deklaracja zmiennej służącej do indeksowania
+   - gdy zastosujemy słowo REVERSE, to zmienna indeksowa będzie przy każdym obejściu pętli zmniejszana o 1 - zakładamy wtedy, że dolna_granica>=gorna_granica
+
+   przykład: drukowanie kwadratów liczb naturalnych:
+
+   create or replace procedure drukuj_kwadraty(p_limit number)
+   is
+   begin
+     for i in 1..p_limit loop
+         dbms_output.put_line(i*i);
+     end loop;
+   end;
+
+
+   c) WHILE
+   pętla WHILE umozliwia wielokrotne wykonywanie tej samej sekwencji instrukcji przy sprawdzaniu warunku poprawności pętli na początku
+
+    WHILE warunek LOOP
+      sekwencja_instrukcji_plsql
+    END LOOP;
+
+    przykład: drukowanie kwadratów liczb naturalnych:
+
+      create or replace procedure drukuj_kwadraty(p_limit number)
+    is
+       i number(10) := 1;
+    begin
+       while i<=p_limit loop
+         dbms_output.put_line(i*i);
+         i := i+1;
+      end loop;
+    end;  
+
+
+zadania
+
+1. napisz funkcję, która zwraca maks. pensje pracowników pracujących w departamencie, którego numer przekazywany jest w parametrze tej funkcji p_dept_id
+
+2. zmodyfikuj tą funkcję tak, aby zwracała maks. pensję pracowników pracujących w departamencie, którego NAZWĘ przekazujesz w jej parametrze
+
+3. napisz procedurę, odpowiedzialną za modyfikację pensji pracowników
+   - parametr p_dept_id określać będzie departament, któremu dajemy podwyżkę
+   - parametr p_percent określać będzie procent podwyżki
+   - procedura ma zatwierdzać transakcję
+
+zadania domowe
+1. napisz procedurę, która będzie wstawiała do tabeli JOB_GRADES nową stawkę płacową
+GRADE_LEVEL nowej stawki powinno być ustawiane na max(GRADE_lEVEL) + 1
+LOVEST_SAL nowej stawki powinno byc ustawiane ma max(HIGHEST_SAL) + 1
+HIGHES_SAL nowej stawki powinno byc ustawiane na LOVEST_SAL nowej stawki + 1000
+
+2. napisz procedurę, której zadaniem będzie znalezienie na zadanym w parametrze P_JOB_ID
+   najlepiej zarabiającego pracownika a następnie jego zwolnienie (usunięcie stosownego wiersza z tabeli EMPLOYEES)
+   procedura powinna przyjmować jeden parametr : P_JOB_ID VARCHAR2
+
+
+
+
+
+
+

@@ -1,0 +1,146 @@
+zadanie
+1. stwórz pakiet PL/SQL dept_ops, który będzie grupował następujące procedury i funkcje:
+
+   a) procedure new_dept(p_department_id number, p_department_name varchar2) 
+      jej zadaniem będzie wstawianie nowego departamentu
+	  
+   b) procedure del_dept(p_department_id number)
+      jej zadaniem będzie usuwanie departamentu o podanym w parametrze identyfikatorze
+      
+create or replace package dept_ops
+is
+   procedure new_dept(p_department_id number, p_department_name varchar2);
+   
+   procedure del_dept(p_department_id number);
+end;
+/
+
+create or replace package body dept_ops
+is
+  procedure new_dept(p_department_id number, p_department_name varchar2)
+  is
+  begin
+     insert into departments(department_id, department_name)
+     values (p_department_id, p_department_name);
+  end;
+  
+  procedure del_dept(p_department_id number)
+  is
+  begin
+     delete from departments
+     where department_id = p_department_id;
+  end;
+end;
+      
+      
+2. w pakiecie dept_ops zdefiniuj
+   - przeciążoną wersję procedury new_dept
+     procedura ta winna przyjmować tylko jeden parametr formalny - p_department_name typu VARCHAR2,
+     natomiast wartość department_id dla nowego departamentu powinna wyznaczać automatycznie, odczytując max(department_id) i zwiększając owo maksimum o 1
+     
+   - przeciążoną wersję procedury del_dept
+     procedura powinna przyjmować tylko jeden parametr formalny p_department_name typu VARCHAR2
+     procedura powinna usuwać departament o podanej w owym parametrze NAZWIE departamentu
+     
+create or replace package dept_ops
+is
+   procedure new_dept(p_department_id number, p_department_name varchar2);
+   
+   procedure new_dept(p_department_name varchar2);
+   
+   procedure del_dept(p_department_id number);
+   
+   procedure del_dept(p_department_name varchar2);
+end;
+/
+
+create or replace package body dept_ops
+is
+  procedure new_dept(p_department_id number, p_department_name varchar2)
+  is
+  begin
+     insert into departments(department_id, department_name)
+     values (p_department_id, p_department_name);
+  end;
+  
+  procedure new_dept(p_department_name varchar2)
+  is
+  begin
+     insert into departments(department_id, department_name)
+     values ((select max(department_id)+1 from departments), p_department_name);
+  end;
+  
+  procedure del_dept(p_department_id number)
+  is
+  begin
+     delete from departments
+     where department_id = p_department_id;
+  end;
+  
+  procedure del_dept(p_department_name varchar2)
+  is
+  begin
+     delete from departments
+     where department_name = p_department_name;
+  end;
+end;
+     
+zadanie domowe
+ stwórz pakiet PL/SQL grupujący następujące składniki
+   1. kursor c_emp umożliwiający odczytywanie wszystkich danych o pracownikach. 
+      Wyniki powinny być posortowane wg. nr departamentu, stanowiska pracy, pensji i nazwiska
+	  oraz procedury otwierające i zamykające kursor c_emp. 
+      Procedura otwierająca powinna otwierać kursor jedynie wtedy, gdy nie jest on otwarty
+	  Procedura zamykająca powinnna zamykać kursor jedynie wtedy, gdy nie jest on zamknięty
+	  
+	  create or replace package pkg_homework_01
+	  is
+	  	cursor c_emp is select * 
+		                from employees 
+						order by department_id, job_ifd, salary, last_name;
+		procedure open_c_emp;
+		procedure close_c_emp;
+	  end;
+	  /
+	  
+	  create or replace package body pkg_homework_01
+	  is
+	  	procedure open_c_emp
+		is
+		begin
+			if not c_emp%isopen then
+				open c_emp;
+			end if;
+		end;
+		
+		procedure close_c_emp
+		is
+		begin
+			if c_emp%isopen then
+				close c_emp;
+			end if;
+		end;
+	 end;
+	 /
+	  
+   2. procedurę, która czyta nr departamentu, nazwisko i pensję pracowników z kursora c_emp i drukuje je na wyjściu przy użyciu
+      odwołania do dbms_output.put_line.
+	  Procedura ta, aoby otwierać i zamykać kursor powinna korzystać z procedur zdefiniowanych w punkcie #b
+	  
+	  create or replace procedure read_emp_data
+	  is
+	  	r_emp c_emp%rowtype;
+	  begin
+	  	pkg_homework_01.open_c_emp;
+		loop
+			fetch c_emp into r_emp;
+			exit when c_emp%notfound;
+			dbms_output.put_line(r_emp.department_id||','||r_emp.last_name||','||r_emp.salary);
+		end loop;
+		pkg_homework_01.close_c_emp;
+	   end;
+	   /
+	   
+	   
+
+

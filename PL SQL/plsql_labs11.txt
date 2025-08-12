@@ -1,0 +1,108 @@
+1. transakcje autonomiczne
+2. bufor wynikowy funkcji
+3. funkcje wołane w schemacie wołającego/właściciela
+
+1. transakcje autonomiczne
+Transakcja autonomiczna jest to transakcja realizowana poza zewnętrznym kontekstem transakcyjnym
+Oznacza to, że można ją zatwierdzić bądź wycofać i operacja taka nie ma wpływu na "zewnętrzną" transakcję
+Transakcje autonomiczne można realizować w dowolnych programach PL/SQL, wliczając w to np. wyzwalacze DML
+Transakcje te mają zastosowanie np. w audytowaniu operacji wykonywanych przez użytkowników
+
+Aby utworzyć program realizujący transakcję autonomiczną należy w sekcji deklaracji zmiennych umieścić dyrektywę kompilatora
+PRAGMA AUTONOMOUS_TRANSACTION
+
+przykład w wyzwalaczu realizującym operację DELETE na tabeli DEPARTMENTS
+
+
+create table log_table
+(operation varchar2(100),
+ username  varchar2(100),
+ operation_date date);
+
+create or replace trigger tr_bef_delete_depts
+before delete on departments
+declare
+	pragma autonomous_transaction;
+begin
+        insert into log_table(operation,username,operation_date)
+        values ('delete on departments',user,sysdate);
+        commit;
+end;
+
+
+2. bufor wynikowy dla funkcji
+Bufor wynikowy pozwala na zapamiętanie wyniku działania stosownej funkcji dla określonych wartości parametrów.
+Dzięki temu ponowne wywołanie tej właśnie funkcji może odczytać wynik z bufora bez konieczności jej wykonywania.
+Aby funkcja korzystała z tej własności należy zadeklarować ją  w stosowny sposób.
+Składnia
+create or replace function ... return TYP result_cache [relies on (TABLE_NAME)]
+is
+...
+
+
+kl. relies on TABLE_NAME pozwala na uzależnienie buforowania wyników od wykonanych w międzyczasie operacji na zadanej tabeli.
+
+przykład:
+
+create or replace function get_max_sal(p_deptno employees.department_id%type) return employees.salary%type result_cache relies_on (employees)
+is
+   v_max_sal employees.salary%type;
+begin
+   select max(salary)
+   into v_max_sal
+   from employees
+   where department_id = p_deptno;
+   
+   return v_max_sal;
+end;
+/ 
+
+3. funkcje wykonywane w schemacie wołającego/właściciela
+Domyślnie w PL/SQL wszystkie programy są wykonywane w schemacie ich właścicieli.
+Oznacza to np. że jeśli w kodzie danej funkcji odwołujemy się do tabeli TABLE_NAME, bez podawania schematu, to funkcja ta zakłada, że owa tabela znajduje się
+w jej schemacie.
+Zachowanie to można zmienić przy pomocy kl. AUTHID
+składnia:
+create or replace <typ_programu> [return wynik] AUTHID <DEFINER|CURRENT_USER>
+is
+...
+
+Uwagi:
+1. jeśli tworzymy pakiet, to stosowna klauzula (AUTHID) może być podana na poziomie pakietu, a nie poszcz. podpgrogramów w nim zawartych
+2. domyślną wartością kl. AUTHID jest DEFINER - czyli program będzie wykonywany w schemacie właściciela
+
+przykład:
+create or replace procedure delete_employee(p_emp_id employees.employee_id%type)
+authid current_user
+is
+begin
+   delete from employees
+   where employee_id = p_emp_id;
+   
+   commit;
+end;
+
+zadania:
+
+1. Utwórz tabelę LOG_DML_OPERATIONS następującym poleceniem:
+   create table log_dml_operations
+   ( timestamp# date,
+     username   varchar2(30),
+     tablename  varchar2(30),
+     operation  varchar2(30) );
+     
+2. utwórz wyzwalacz związany z operacjami DML na tabeli EMPLOYEES, który
+   - będzie wyzwalaczem AFTER dla każdej operacji 
+   - będzie wyzwalaczem poleceniowym, a nie wierszowym
+   - celem nieodwracalnego zapisu do tabeli LOG_DML_OPERATIONS będzie wykorzystywał transakcje autonomiczne
+   - do tabeli utworzonej w kroku 1 będzie zapisywał informację o wykonanej operacji
+   - wyzwalacz powinien zatwierdzać transakcję
+
+zadanie domowe
+
+3. utwórz funkcję, posługującą się buforem wynikowym.
+   Jej celem będzie zwrócenie liczby wierszy z iloczynu kartezjańskiego EMPLOYEES x EMPLOYEES x EMPLOYEES x EMPLOYEES x EMPLOYEES x EMPLOYEES
+   Buforowanie wyniku będzie zależało od tabeli EMPLOYEES
+   Kilkukrotnie wykonaj ową funkcję, mierząc czasy wykonań
+   
+   
